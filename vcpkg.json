@@ -1,0 +1,11 @@
+{
+  "name": "netease-sensitive-word",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "cpp-httplib",
+    "re2",
+    "nlohmann-json",
+    "openssl",
+    "pcre2"
+  ]
+}
