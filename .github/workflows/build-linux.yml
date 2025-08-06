@@ -1,6 +1,5 @@
 name: Build Linux Executable
 
-# 触发工作流的事件
 on:
   push:
     branches: [ "main", "master" ]
@@ -10,7 +9,6 @@ on:
 
 jobs:
   build:
-    # 指定运行器环境
     runs-on: ubuntu-latest
 
     steps:
@@ -18,36 +16,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 步骤 2: 使用 vcpkg 安装 C++ 依赖 (使用正确的 Action 路径)
+      # 步骤 2: 安装 Vcpkg 并构建依赖
+      # 这是修正后的关键步骤，使用了最新的 run-vcpkg Action
+      # 它会自动定位 vcpkg.json 文件并安装所有依赖
       - name: Install C++ dependencies with vcpkg
-        uses: microsoft/vcpkg-tool/setup-vcpkg@v1 # <-- 这里是修正后的行
+        uses: lukka/run-vcpkg@v11
         with:
-          # vcpkgCommitId 是可选的，用于锁定vcpkg的版本以保证构建的可重复性
-          # 你可以从 https://github.com/microsoft/vcpkg/commits/master 获取最新的 commit id
-          # 如果不指定，它会使用最新的 vcpkg 版本
-          vcpkgCommitId: 19175404533f81395368a5c9535f29f12d08a55b
+          # vcpkgJsonGlob: 'vcpkg.json' # 这是默认值，可以不写
+          # vcpkgGitCommitId: '...' # 如果需要锁定vcpkg版本，可以在这里指定commit id
+          # runVcpkgInstall: true # 默认就是true, 会自动运行安装命令
 
       # 步骤 3: 配置 CMake
-      # -S . 表示源码在当前目录
-      # -B build 表示构建目录为 build
-      # CMAKE_TOOLCHAIN_FILE 指向 vcpkg 的工具链文件，这是让 CMake 找到 vcpkg 所安装库的关键
-      # CMAKE_BUILD_TYPE=Release 表示构建发布版本
+      # run-vcpkg 会自动设置 VCPKG_ROOT 环境变量，我们可以直接使用
       - name: Configure CMake
         run: >
-          cmake -S . -B build
+          cmake -B build -S .
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
       # 步骤 4: 构建项目
-      # --config Release 再次确认构建类型
-      # -j $(nproc) 使用所有可用的 CPU核心进行并行编译，加快速度
       - name: Build the project
         run: cmake --build build --config Release -j $(nproc)
 
-      # 步骤 5: 上传构建产物 (可执行文件)
-      # 这样你就可以在 Actions 页面下载编译好的文件了
+      # 步骤 5: 上传构建产物
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-executable # 上传文件的名称
-          path: build/Netease_sensitive_word # 要上传的文件路径
+          name: linux-executable
+          path: build/Netease_sensitive_word
