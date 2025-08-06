@@ -29,13 +29,19 @@ jobs:
           pkg-config \
           wget \
           tar \
-          gzip
+          gzip \
+          zip \
+          curl
 
-    - name: Install C++ libraries via vcpkg
+    - name: Install vcpkg
       run: |
         git clone https://github.com/Microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg install --classic nlohmann-json re2 httplib pcre2 openssl
+
+    - name: Install C++ libraries via vcpkg (Classic Mode)
+      # 关键：使用 --classic 强制进入经典模式，并使用正确的库名
+      run: |
+        ./vcpkg/vcpkg install --classic nlohmann-json re2 cpp-httplib pcre2 openssl
         ./vcpkg/vcpkg integrate install
 
     - name: Configure CMake
@@ -54,23 +60,11 @@ jobs:
     - name: Package executable
       run: |
         cd build
-        # 打印当前工作目录和文件列表，用于调试
-        pwd
-        ls -l
-
         TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
         COMMIT_SHORT=$(git rev-parse --short HEAD)
-        
-        # 创建打包目录
         mkdir -p "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
-        
-        # 将可执行文件复制到打包目录
         cp Netease_sensitive_word "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}/"
-        
-        # 压缩打包
         tar -czf "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
-        
-        # 移动打包文件到 artifact 目录
         mkdir -p ./artifact
         mv "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" ./artifact/
 
