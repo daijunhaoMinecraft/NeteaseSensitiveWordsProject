@@ -1,8 +1,12 @@
-name: Build Linux Executable
+name: Build and Package on Every Push
 
 on:
   push:
-    tags: ['v*']  # 触发 tag 发布时打包，例如 v1.0.0
+    branches: 
+      - '**'  # 所有分支的 push 都触发
+  pull_request:
+    branches:
+      - '**'
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -14,26 +18,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           g++ \
           cmake \
           libssl-dev \
+          libpcre2-dev \
           pkg-config \
           wget \
           tar \
           gzip
 
-    - name: Install PCRE2 via apt
-      run: |
-        sudo apt-get install -y libpcre2-dev
-
-    - name: Install nlohmann_json via vcpkg
+    - name: Install C++ libraries via vcpkg
       run: |
         git clone https://github.com/Microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
+        # 安装所需的库（httplib, re2, nlohmann_json）
         ./vcpkg/vcpkg install nlohmann-json re2 httplib
         ./vcpkg/vcpkg integrate install
 
@@ -45,7 +47,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
 
-    - name: Build
+    - name: Build project
       run: |
         cd build
         cmake --build . --config Release -j$(nproc)
@@ -53,37 +55,16 @@ jobs:
     - name: Package executable
       run: |
         cd build
-        mkdir -p Netease_sensitive_word_linux
-        cp Netease_sensitive_word Netease_sensitive_word_linux/
-        tar -czf Netease_sensitive_word_linux.tar.gz Netease_sensitive_word_linux
+        TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+        COMMIT_SHORT=$(git rev-parse --short HEAD)
+        mkdir -p "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
+        cp Netease_sensitive_word "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}/"
+        tar -czf "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
         mkdir -p ./artifact
-        mv Netease_sensitive_word_linux.tar.gz ./artifact/
+        mv "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" ./artifact/
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         path: build/artifact/
-
-    # Optional: Create GitHub Release and upload binary
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Release Asset
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: build/artifact/Netease_sensitive_word_linux.tar.gz
-        asset_name: Netease_sensitive_word_linux_${{ github.ref_name }}.tar.gz
-        asset_content_type: application/gzip
+        retention-days: 7  # 保留最近 7 天的构建产物
