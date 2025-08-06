@@ -1,53 +1,53 @@
 name: Build Linux Executable
 
-# ´¥·¢¹¤×÷Á÷µÄÊÂ¼ş
+# è§¦å‘å·¥ä½œæµçš„äº‹ä»¶
 on:
   push:
-    branches: [ "main", "master" ] # µ±ÍÆËÍµ½ main »ò master ·ÖÖ§Ê±´¥·¢
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main", "master" ] # µ±Ïò main »ò master ·ÖÖ§·¢Æğ PR Ê±´¥·¢
-  workflow_dispatch: # ÔÊĞíÊÖ¶¯´¥·¢
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    # Ö¸¶¨ÔËĞĞÆ÷»·¾³
+    # æŒ‡å®šè¿è¡Œå™¨ç¯å¢ƒ
     runs-on: ubuntu-latest
 
     steps:
-      # ²½Öè 1: ¼ì³öÄãµÄ´úÂë
+      # æ­¥éª¤ 1: æ£€å‡ºä½ çš„ä»£ç 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ²½Öè 2: Ê¹ÓÃ vcpkg °²×° C++ ÒÀÀµ
-      # ´Ë²½Öè»á×Ô¶¯¶ÁÈ¡ÄãÏîÄ¿¸ùÄ¿Â¼ÏÂµÄ vcpkg.json ÎÄ¼ş²¢°²×°ËùÓĞÁĞ³öµÄ¿â
+      # æ­¥éª¤ 2: ä½¿ç”¨ vcpkg å®‰è£… C++ ä¾èµ– (ä½¿ç”¨æ­£ç¡®çš„ Action è·¯å¾„)
       - name: Install C++ dependencies with vcpkg
-        uses: microsoft/setup-vcpkg@v1.2.1
+        uses: microsoft/vcpkg-tool/setup-vcpkg@v1 # <-- è¿™é‡Œæ˜¯ä¿®æ­£åçš„è¡Œ
         with:
-          # vcpkgCommitId ÊÇ¿ÉÑ¡µÄ£¬ÓÃÓÚËø¶¨vcpkgµÄ°æ±¾ÒÔ±£Ö¤¹¹½¨µÄ¿ÉÖØ¸´ĞÔ
-          # Äã¿ÉÒÔ´Ó https://github.com/microsoft/vcpkg/commits/master »ñÈ¡×îĞÂµÄ commit id
+          # vcpkgCommitId æ˜¯å¯é€‰çš„ï¼Œç”¨äºé”å®švcpkgçš„ç‰ˆæœ¬ä»¥ä¿è¯æ„å»ºçš„å¯é‡å¤æ€§
+          # ä½ å¯ä»¥ä» https://github.com/microsoft/vcpkg/commits/master è·å–æœ€æ–°çš„ commit id
+          # å¦‚æœä¸æŒ‡å®šï¼Œå®ƒä¼šä½¿ç”¨æœ€æ–°çš„ vcpkg ç‰ˆæœ¬
           vcpkgCommitId: 19175404533f81395368a5c9535f29f12d08a55b
 
-      # ²½Öè 3: ÅäÖÃ CMake
-      # -S . ±íÊ¾Ô´ÂëÔÚµ±Ç°Ä¿Â¼
-      # -B build ±íÊ¾¹¹½¨Ä¿Â¼Îª build
-      # CMAKE_TOOLCHAIN_FILE Ö¸Ïò vcpkg µÄ¹¤¾ßÁ´ÎÄ¼ş£¬ÕâÊÇÈÃ CMake ÕÒµ½ vcpkg Ëù°²×°¿âµÄ¹Ø¼ü
-      # CMAKE_BUILD_TYPE=Release ±íÊ¾¹¹½¨·¢²¼°æ±¾
+      # æ­¥éª¤ 3: é…ç½® CMake
+      # -S . è¡¨ç¤ºæºç åœ¨å½“å‰ç›®å½•
+      # -B build è¡¨ç¤ºæ„å»ºç›®å½•ä¸º build
+      # CMAKE_TOOLCHAIN_FILE æŒ‡å‘ vcpkg çš„å·¥å…·é“¾æ–‡ä»¶ï¼Œè¿™æ˜¯è®© CMake æ‰¾åˆ° vcpkg æ‰€å®‰è£…åº“çš„å…³é”®
+      # CMAKE_BUILD_TYPE=Release è¡¨ç¤ºæ„å»ºå‘å¸ƒç‰ˆæœ¬
       - name: Configure CMake
         run: >
           cmake -S . -B build
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
-      # ²½Öè 4: ¹¹½¨ÏîÄ¿
-      # --config Release ÔÙ´ÎÈ·ÈÏ¹¹½¨ÀàĞÍ
-      # -j $(nproc) Ê¹ÓÃËùÓĞ¿ÉÓÃµÄ CPUºËĞÄ½øĞĞ²¢ĞĞ±àÒë£¬¼Ó¿ìËÙ¶È
+      # æ­¥éª¤ 4: æ„å»ºé¡¹ç›®
+      # --config Release å†æ¬¡ç¡®è®¤æ„å»ºç±»å‹
+      # -j $(nproc) ä½¿ç”¨æ‰€æœ‰å¯ç”¨çš„ CPUæ ¸å¿ƒè¿›è¡Œå¹¶è¡Œç¼–è¯‘ï¼ŒåŠ å¿«é€Ÿåº¦
       - name: Build the project
         run: cmake --build build --config Release -j $(nproc)
 
-      # ²½Öè 5: ÉÏ´«¹¹½¨²úÎï (¿ÉÖ´ĞĞÎÄ¼ş)
-      # ÕâÑùÄã¾Í¿ÉÒÔÔÚ Actions Ò³ÃæÏÂÔØ±àÒëºÃµÄÎÄ¼şÁË
+      # æ­¥éª¤ 5: ä¸Šä¼ æ„å»ºäº§ç‰© (å¯æ‰§è¡Œæ–‡ä»¶)
+      # è¿™æ ·ä½ å°±å¯ä»¥åœ¨ Actions é¡µé¢ä¸‹è½½ç¼–è¯‘å¥½çš„æ–‡ä»¶äº†
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-executable # ÉÏ´«ÎÄ¼şµÄÃû³Æ
-          path: build/Netease_sensitive_word # ÒªÉÏ´«µÄÎÄ¼şÂ·¾¶
+          name: linux-executable # ä¸Šä¼ æ–‡ä»¶çš„åç§°
+          path: build/Netease_sensitive_word # è¦ä¸Šä¼ çš„æ–‡ä»¶è·¯å¾„
