@@ -1,3 +1,4 @@
+// test
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -53,9 +54,9 @@ struct ReviewWordsResult
     int code;
     std::string message;
     ReviewWordsRegularId regularIdList;
-    // extra ◊™ªª∫Ûµƒƒ⁄»›
+    // extra ËΩ¨Êç¢ÂêéÁöÑÂÜÖÂÆπ
     std::string ReplaceContent;
-    // extra ‘≠œ»ƒ⁄»›
+    // extra ÂéüÂÖàÂÜÖÂÆπ
     std::string OriginalContent;
 };
 
@@ -100,9 +101,9 @@ std::string base64_decode(const std::string& input) {
     for (unsigned char c : input) {
         if (c == '=') break;
 
-        // ?????????BASE64_CHARS?ß÷?????
+        // ?????????BASE64_CHARS?–µ?????
         size_t pos = BASE64_CHARS.find(c);
-        if (pos == std::string::npos) continue; // ??????ßπ???
+        if (pos == std::string::npos) continue; // ??????–ß???
 
         val = (val << 6) + pos;
         valb += 6;
@@ -122,9 +123,9 @@ std::vector<uint8_t> base64_decode_to_bytes(const std::string& input) {
     for (unsigned char c : input) {
         if (c == '=') break;
 
-        // ?????????BASE64_CHARS?ß÷?????
+        // ?????????BASE64_CHARS?–µ?????
         size_t pos = BASE64_CHARS.find(c);
-        if (pos == std::string::npos) continue; // ??????ßπ???
+        if (pos == std::string::npos) continue; // ??????–ß???
 
         val = (val << 6) + pos;
         valb += 6;
@@ -220,7 +221,7 @@ std::vector<uint8_t> rc4_encrypt_bytes(const std::vector<uint8_t>& data, const s
     return rc4.crypt(data);
 }
 
-// RC4???????????????∑⁄??
+// RC4???????????????Ê±æ??
 std::string rc4_encrypt(const std::string& data, const std::string& key) {
     RC4 rc4;
     rc4.init(key);
@@ -238,7 +239,7 @@ std::string bytes_to_string(const std::vector<uint8_t>& bytes) {
 }
 
 
-// ?????????ß’?????
+// ?????????–¥?????
 std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
     // {"info":{"deviceid":"6A4B-A3A3-D87C-11C5-6477","gameid":"g79","network":"wifi","sys":"cpp","version":"1.0.9"}}
     std::string request_data = "{\"info\":{\"deviceid\":\"6A4B-A3A3-D87C-11C5-6477\",\"gameid\":\"" + gameid + "\",\"network\":\"wifi\",\"sys\":\"cpp\",\"version\":\"1.0.9\"}}";
@@ -270,7 +271,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
     std::string GetUrl = GetJsonResponse["url"];
     //std::cout << "Get URL: " << GetUrl << std::endl;
 
-    // ??URL?ß’??HTTPS
+    // ??URL?–¥??HTTPS
     // URL??
     size_t protocol_end = GetUrl.find("://");
     if (protocol_end == std::string::npos) {
@@ -324,7 +325,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
 SensitiveWordFilter sensitive_word_filter_g79;
 SensitiveWordFilter sensitive_word_filter_x19;
 
-// –ﬁ∏ƒinit_sensitive_word∫Ø ˝£¨ÃÌº”gameid≤Œ ˝∫Õ∂‘”¶µƒ√Ù∏–¥ π˝¬À∆˜
+// ‰øÆÊîπinit_sensitive_wordÂáΩÊï∞ÔºåÊ∑ªÂä†gameidÂèÇÊï∞ÂíåÂØπÂ∫îÁöÑÊïèÊÑüËØçËøáÊª§Âô®
 void init_sensitive_word(SensitiveWordFilter& filter, const std::string& gameid){
     // ?
     filter.RegexList.clear();
@@ -390,17 +391,17 @@ std::string ReplaceNickName(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
                 if (rc > 0) {
-                    // ß’?ùIß’?length*"*"
+                    // –¥?Êªª–¥?length*"*"
                     // ????
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // ùI?
+                    // Êªª?
                     std::string replace_str(length, '*');
 
-                    // ùIß’
+                    // Êªª–¥
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -437,7 +438,7 @@ ReviewNickNameResult reviewNickName(const std::string& text, SensitiveWordFilter
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
                 if (rc > 0) {
-                    // ß’: shield
+                    // –¥: shield
                     is_pass = false;
                     result.NickNameRegularId.push_back(RegexID);
                 }
@@ -476,17 +477,17 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // ß’?ùIß’?length*"*"
+                    // –¥?Êªª–¥?length*"*"
                     // ????
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // ùI?
+                    // Êªª?
                     std::string replace_str(length, '*');
 
-                    // ùIß’
+                    // Êªª–¥
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -504,17 +505,17 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // ß’?ùIß’?length*"*"
+                    // –¥?Êªª–¥?length*"*"
                     // ????
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // ùI?
+                    // Êªª?
                     std::string replace_str(length, '*');
 
-                    // ùIß’
+                    // Êªª–¥
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -533,17 +534,17 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // ß’?ùIß’?length*"*"
+                    // –¥?Êªª–¥?length*"*"
                     // ????
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // ùI?
+                    // Êªª?
                     std::string replace_str(length, '*');
 
-                    // ùIß’
+                    // Êªª–¥
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -580,7 +581,7 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
-                    // ß’: shield
+                    // –¥: shield
                     is_pass = false;
                     RegularId.Intercept.push_back(RegexID);
                 }
@@ -597,7 +598,7 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
-                    // ß’
+                    // –¥
                     is_pass = false;
                     RegularId.Intercept.push_back(RegexID);
                 }
@@ -613,7 +614,7 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
-                    // ß’
+                    // –¥
                     is_pass = false;
                     RegularId.Replace.push_back(RegexID);
                 }
@@ -649,7 +650,7 @@ ReviewWordsResult reviewWords_Request(const std::string& content, const std::str
     else {
         RequestResult.OriginalContent = content;
         if (RequestResult.ReplaceContent.find("level=" + level + "_channel=" + channel + "_content=") == std::string::npos) {
-            // ??"*"???¶¬
+            // ??"*"???Œ≤
             size_t pos = RequestResult.ReplaceContent.find("*");
             if (pos != std::string::npos) {
                 RequestResult.ReplaceContent = RequestResult.ReplaceContent.substr(pos);
@@ -671,18 +672,18 @@ ReviewWordsResult reviewWords_Request(const std::string& content, const std::str
 }
 
 std::atomic<bool> should_refresh_sensitive_words(true);
-// ?????????ß’???????
+// ?????????–¥???????
 void schedule_sensitive_word_refresh() {
     std::thread([]() {
         while (true) {
-            // ???1ß≥????????????????????ß’??
+            // ???1–°????????????????????–¥??
             std::this_thread::sleep_for(std::chrono::hours(1));
 
             if (should_refresh_sensitive_words.load()) {
                 std::cout << "Refresh Sensitive words" << std::endl;
 
                 try {
-                    // ???????????ß’??
+                    // ???????????–¥??
                     init_sensitive_word(sensitive_word_filter_g79, "g79");
                     init_sensitive_word(sensitive_word_filter_x19, "x19");
 
@@ -704,12 +705,12 @@ int main(int argc, char** argv) {
     schedule_sensitive_word_refresh();
     httplib::Server svr;
 
-    // °§???
+    // ¬∑???
     svr.Get("/", [](const httplib::Request& req, httplib::Response& res) {
         res.set_content("Hello World!", "text/plain");
     });
 
-    // g79√Ù∏–¥ ºÏ≤‚¬∑”…
+    // g79ÊïèÊÑüËØçÊ£ÄÊµãË∑ØÁî±
     svr.Post("/g79/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
@@ -722,7 +723,7 @@ int main(int argc, char** argv) {
             std::string channel = json_content["channel"];
             std::string word = json_content["word"];
 
-            // ¸D
+            // È∫Ø
             ReviewWordsResult result = reviewWords_Request(word, level, channel, sensitive_word_filter_g79);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
@@ -731,7 +732,7 @@ int main(int argc, char** argv) {
             response_json["code"] = result.code;
             response_json["message"] = result.message;
 
-            // ß›regularIdList
+            // –ªregularIdList
             nlohmann::json regular_id_list_json;
             regular_id_list_json["Shield"] = nlohmann::json::array();
             regular_id_list_json["Intercept"] = nlohmann::json::array();
@@ -778,7 +779,7 @@ int main(int argc, char** argv) {
             // ?
             std::string NickName = json_content["nickname"];
 
-            // ¸D
+            // È∫Ø
             ReviewNickNameResult result = reviewNickName(NickName, sensitive_word_filter_g79);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
@@ -805,7 +806,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    // x19√Ù∏–¥ ºÏ≤‚¬∑”…
+    // x19ÊïèÊÑüËØçÊ£ÄÊµãË∑ØÁî±
     svr.Post("/x19/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
@@ -818,7 +819,7 @@ int main(int argc, char** argv) {
             std::string channel = json_content["channel"];
             std::string word = json_content["word"];
 
-            // ¸D
+            // È∫Ø
             ReviewWordsResult result = reviewWords_Request(word, level, channel, sensitive_word_filter_x19);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
@@ -827,7 +828,7 @@ int main(int argc, char** argv) {
             response_json["code"] = result.code;
             response_json["message"] = result.message;
 
-            // ß›regularIdList
+            // –ªregularIdList
             nlohmann::json regular_id_list_json;
             regular_id_list_json["Shield"] = nlohmann::json::array();
             regular_id_list_json["Intercept"] = nlohmann::json::array();
@@ -874,7 +875,7 @@ int main(int argc, char** argv) {
             // ?
             std::string NickName = json_content["nickname"];
 
-            // ¸D
+            // È∫Ø
             ReviewNickNameResult result = reviewNickName(NickName, sensitive_word_filter_x19);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
