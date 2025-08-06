@@ -3,11 +3,11 @@ name: Build and Package on Every Push
 on:
   push:
     branches: 
-      - '**'  # 所有分支的 push 都触发
+      - '**'
   pull_request:
     branches:
       - '**'
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build-linux:
@@ -35,7 +35,6 @@ jobs:
       run: |
         git clone https://github.com/Microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
-        # 安装所需的库（httplib, re2, nlohmann_json）
         ./vcpkg/vcpkg install nlohmann-json re2 httplib
         ./vcpkg/vcpkg integrate install
 
@@ -61,10 +60,10 @@ jobs:
         cp Netease_sensitive_word "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}/"
         tar -czf "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
         mkdir -p ./artifact
-        mv "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" ./artifact/
+        mv "*.tar.gz" ./artifact/
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # ✅ 已升级到 v4
       with:
         path: build/artifact/
-        retention-days: 7  # 保留最近 7 天的构建产物
+        retention-days: 7
