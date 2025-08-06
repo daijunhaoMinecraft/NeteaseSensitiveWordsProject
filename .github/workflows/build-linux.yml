@@ -35,7 +35,8 @@ jobs:
       run: |
         git clone https://github.com/Microsoft/vcpkg.git
         ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg install nlohmann-json re2 httplib
+        # 不带包名，vcpkg 会读取 vcpkg.json
+        ./vcpkg/vcpkg install
         ./vcpkg/vcpkg integrate install
 
     - name: Configure CMake
