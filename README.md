@@ -18,7 +18,7 @@
 - **HTTP 服务**: cpp-httplib
 - **JSON 处理**: nlohmann/json
 - **正则表达式**: PCRE2
-- **加密**: RC4 算法
+- **解密**: RC4 算法
 - **SSL/TLS**: OpenSSL
 
 ## 编译依赖
@@ -52,7 +52,7 @@ g++ -std=c++17 -O2 \
 ## 运行
 
 ```bash
-./sensitive_word_filter
+./Netease_sensitive_word
 ```
 
 服务将在 `http://0.0.0.0:8143` 启动。
