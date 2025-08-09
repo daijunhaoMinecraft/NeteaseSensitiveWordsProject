@@ -216,7 +216,7 @@ print(json.dumps(result, indent=2, ensure_ascii=False))
 
 ## 许可证
 
-本项目采用 GPL 许可证。
+本项目采用 GPL 3 许可证。
 
 ## 贡献
 
