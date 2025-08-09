@@ -81,13 +81,13 @@ g++ -std=c++17 -O2 \
 响应:
 ```json
 {
-    "code": 0,
-    "message": "pass",
+    "code": 0, // 返回代码，0 = 未检测到, 1 = 检测到
+    "message": "pass", // pass = 通过, not pass = 未通过
     "regularIdList": {
         "Shield": [],
         "Intercept": [],
         "Replace": []
-    },
+    }, // 匹配到的规则列表
     "ReplaceContent": "处理后的内容",
     "OriginalContent": "原始内容"
 }
@@ -135,6 +135,8 @@ g++ -std=c++17 -O2 \
 2. **Intercept (拦截)**: 检测到敏感词时拦截，同样替换为 `*` 号
 3. **Replace (替换)**: 替换敏感词为 `*` 号
 4. **Nickname (昵称)**: 专门用于昵称检测的规则
+
+需注意的是网易敏感词库可能会因为莫些正则表达式的原因而导致整句话都被屏蔽
 
 ## 配置说明
 
