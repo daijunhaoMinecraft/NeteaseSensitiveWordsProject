@@ -45,7 +45,7 @@ cd sensitive-word-filter
 g++ -std=c++17 -O2 \
     -DCPPHTTPLIB_OPENSSL_SUPPORT \
     -I/usr/include/pcre2 \
-    -o sensitive_word_filter main.cpp \
+    -o Netease_sensitive_word main.cpp \
     -lpcre2-8 -lssl -lcrypto -lpthread
 ```
 
