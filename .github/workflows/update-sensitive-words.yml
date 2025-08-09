@@ -1,0 +1,36 @@
+# .github/workflows/update-sensitive-words.yml
+name: 🔄 Auto Update Sensitive Words
+
+on:
+  # 每天北京时间 11:00 (UTC 03:00) 自动运行
+  schedule:
+    - cron: '0 3 * * *'
+  # 支持手动触发
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 允许提交文件到仓库
+
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # 使用内置 token 推送
+
+      - name: 🐍 Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Dependencies
+        run: |
+          pip install requests pycryptodome
+
+      - name: 🚀 Run Update Script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 自动注入
+        run: |
+          python update_script.py
