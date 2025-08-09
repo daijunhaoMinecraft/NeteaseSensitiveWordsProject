@@ -100,11 +100,8 @@ std::string base64_decode(const std::string& input) {
 
     for (unsigned char c : input) {
         if (c == '=') break;
-
-        // ?????????BASE64_CHARS?е?????
         size_t pos = BASE64_CHARS.find(c);
-        if (pos == std::string::npos) continue; // ??????Ч???
-
+        if (pos == std::string::npos) continue;
         val = (val << 6) + pos;
         valb += 6;
         if (valb >= 0) {
@@ -122,11 +119,8 @@ std::vector<uint8_t> base64_decode_to_bytes(const std::string& input) {
 
     for (unsigned char c : input) {
         if (c == '=') break;
-
-        // ?????????BASE64_CHARS?е?????
         size_t pos = BASE64_CHARS.find(c);
-        if (pos == std::string::npos) continue; // ??????Ч???
-
+        if (pos == std::string::npos) continue;
         val = (val << 6) + pos;
         valb += 6;
         if (valb >= 0) {
@@ -138,24 +132,20 @@ std::vector<uint8_t> base64_decode_to_bytes(const std::string& input) {
     return decoded;
 }
 
-// RC4?????????????????
 class RC4 {
 private:
     unsigned char s[256];
 
 public:
-    // ?????S??
     void init(const std::vector<uint8_t>& key) {
         int key_len = key.size();
         unsigned char k[256];
 
-        // ?????S??
         for (int i = 0; i < 256; i++) {
             s[i] = i;
             k[i] = key[i % key_len];
         }
 
-        // ???????
         int j = 0;
         for (int i = 0; i < 256; i++) {
             j = (j + s[i] + k[i]) % 256;
@@ -163,13 +153,11 @@ public:
         }
     }
 
-    // ????????????????
     void init(const std::string& key) {
         std::vector<uint8_t> key_bytes(key.begin(), key.end());
         init(key_bytes);
     }
 
-    // ??????????????????????
     std::vector<uint8_t> crypt(const std::vector<uint8_t>& data) {
         std::vector<uint8_t> result;
         result.reserve(data.size());
@@ -185,8 +173,6 @@ public:
 
         return result;
     }
-
-    // ????????????????????????
     std::string crypt(const std::string& data) {
         std::vector<uint8_t> data_bytes(data.begin(), data.end());
         std::vector<uint8_t> result_bytes = crypt(data_bytes);
@@ -194,59 +180,52 @@ public:
     }
 };
 
-// RC4?????????????????
 std::vector<uint8_t> rc4_decrypt_bytes(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
     RC4 rc4;
     rc4.init(key);
     return rc4.crypt(data);
 }
 
-// RC4????????????????????
 std::string rc4_decrypt_bytes_to_string(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
     std::vector<uint8_t> decrypted = rc4_decrypt_bytes(data, key);
     return std::string(decrypted.begin(), decrypted.end());
 }
 
-// RC4???????????????????????
 std::string rc4_decrypt(const std::string& data, const std::string& key) {
     RC4 rc4;
     rc4.init(key);
     return rc4.crypt(data);
 }
 
-// RC4????????????????????
 std::vector<uint8_t> rc4_encrypt_bytes(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
     RC4 rc4;
     rc4.init(key);
     return rc4.crypt(data);
 }
 
-// RC4???????????????汾??
 std::string rc4_encrypt(const std::string& data, const std::string& key) {
     RC4 rc4;
     rc4.init(key);
     return rc4.crypt(data);
 }
 
-// ????????????????????????????
 std::vector<uint8_t> string_to_bytes(const std::string& str) {
     return std::vector<uint8_t>(str.begin(), str.end());
 }
 
-// ????????????????????????????
 std::string bytes_to_string(const std::vector<uint8_t>& bytes) {
     return std::string(bytes.begin(), bytes.end());
 }
 
 
-// ?????????д?????
+// 在线获取网易敏感词配置
 std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
     // {"info":{"deviceid":"6A4B-A3A3-D87C-11C5-6477","gameid":"g79","network":"wifi","sys":"cpp","version":"1.0.9"}}
     std::string request_data = "{\"info\":{\"deviceid\":\"6A4B-A3A3-D87C-11C5-6477\",\"gameid\":\"" + gameid + "\",\"network\":\"wifi\",\"sys\":\"cpp\",\"version\":\"1.0.9\"}}";
-    // ?base64
+    // Base64编码
     std::string base64_request_data = base64_encode(request_data);
 
-    // ????URL?HTTP
+    // 创建http请求
     httplib::Client cli("http://optsdk.gameyw.netease.com");
     httplib::Headers headers = {
         {"Content-Type", "application/x-www-form-urlencoded"}
@@ -267,12 +246,11 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         return "";
     }
 
-    // ?URL
+    // 获取url
     std::string GetUrl = GetJsonResponse["url"];
     //std::cout << "Get URL: " << GetUrl << std::endl;
 
-    // ??URL?д??HTTPS
-    // URL??
+    // Https请求获取加密敏感词库
     size_t protocol_end = GetUrl.find("://");
     if (protocol_end == std::string::npos) {
         std::cerr << "Invalid URL format" << std::endl;
@@ -291,9 +269,8 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
 
     //std::cout << "Host: " << host << ", Path: " << path << std::endl;
 
-    // ?SSLClientHTTPS
     httplib::SSLClient ssl_cli(host.c_str());
-    // ???SSL/TLS
+    // 禁用证书验证
     ssl_cli.enable_server_certificate_verification(false);
 
     auto response2 = ssl_cli.Get(path.c_str());
@@ -303,7 +280,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         return "";
     }
 
-    // ?RC4???
+    // 解密敏感词库
     std::vector<uint8_t> encrypted_data = base64_decode_to_bytes(response2->body);
 
     std::string key;
@@ -314,41 +291,41 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         key = "c42bf7f39d479999";
     }
 
-    // ?
+    // RC4解密加密字节
     std::string decrypted_data = rc4_decrypt_bytes_to_string(encrypted_data, string_to_bytes(key));
 
-    // ?????
+    // 返回解密后的敏感词库
     return decrypted_data;
 }
 
-// ??
+// 初始化敏感词(全局变量)
 SensitiveWordFilter sensitive_word_filter_g79;
 SensitiveWordFilter sensitive_word_filter_x19;
 
 // 修改init_sensitive_word函数，添加gameid参数和对应的敏感词过滤器
 void init_sensitive_word(SensitiveWordFilter& filter, const std::string& gameid){
-    // ?
+    // 清空之前的敏感词库
     filter.RegexList.clear();
-    // ??
+    // 在线获取敏感词库
     std::string GetConfigFile = GetSensitiveWordConfigOnline(gameid);
     if (GetConfigFile.empty()) {
         std::cerr << "Failed to get sensitive word config for game: " << gameid << std::endl;
         return;
     }
-    // ?json
+    // 转换成json
     nlohmann::json json_content = nlohmann::json::parse(GetConfigFile);
-    // json
+    // 遍历规则
     for (auto& item : json_content["regex"].items()) {
-        // ?key
+        // 获取规则名称
         std::string key = item.key(); // intercept/shield/replace/nickname/remind
         RegexTypeStruct regex_type;
         regex_type.RegexType = key;
         regex_type.RegexList.clear();
+        // 遍历单个规则中的所有敏感词库
         for (auto& Pcre2Regex : json_content["regex"][key].items()) {
             std::string RegexID = Pcre2Regex.key();
             std::string Regex = Pcre2Regex.value();
-            // PCRE2?
-            // PCRE2?
+            // PCRE2解析
             int errornumber;
             PCRE2_SIZE erroroffset;
             uint32_t compile_options = PCRE2_UTF | PCRE2_UCP;
@@ -378,30 +355,27 @@ std::string ReplaceNickName(std::string text, SensitiveWordFilter& filter) {
     std::string replaced_text = text;
     bool IsPass = true;
     for (auto &regex_type: filter.RegexList) {
-        // ??
+        // 获取规则名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Nickname) {
             for (auto &regex: regex_type.RegexList) {
-                // ??
+                // 初始化常量
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
+                // 匹配
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
                 if (rc > 0) {
-                    // д?滻д?length*"*"
-                    // ????
+                    // 检测到敏感词(执行替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // 滻?
                     std::string replace_str(length, '*');
 
-                    // 滻д
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -421,24 +395,21 @@ ReviewNickNameResult reviewNickName(const std::string& text, SensitiveWordFilter
 {
     ReviewNickNameResult result;
     bool is_pass = true;
-    // ?List
-    //
-    // shield
     for (auto& regex_type : filter.RegexList) {
-        // ??
+        // 获取规则名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Nickname) {
             for (auto &regex: regex_type.RegexList) {
-                // ??
+                // 初始化常量
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
+                // 匹配规则
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
                 if (rc > 0) {
-                    // д: shield
+                    // 匹配到: shield
                     is_pass = false;
                     result.NickNameRegularId.push_back(RegexID);
                 }
@@ -464,11 +435,11 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
     std::string replaced_text = text;
     bool IsPass = true;
     for (auto &regex_type: filter.RegexList) {
-        // ??
+        // 获取规则名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Shield) {
             for (auto &regex: regex_type.RegexList) {
-                // ??
+                // 初始化常量
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
@@ -477,17 +448,14 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // д?滻д?length*"*"
-                    // ????
+                    // 匹配到规则(执行替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // 滻?
                     std::string replace_str(length, '*');
 
-                    // 滻д
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -505,17 +473,14 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // д?滻д?length*"*"
-                    // ????
+                    // 匹配到规则(替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // 滻?
                     std::string replace_str(length, '*');
 
-                    // 滻д
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -534,17 +499,14 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                      match_data, nullptr);
                 if (rc > 0) {
-                    // д?滻д?length*"*"
-                    // ????
+                    // 匹配到规则(替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
                     PCRE2_SIZE length = end - start;
 
-                    // 滻?
                     std::string replace_str(length, '*');
 
-                    // 滻д
                     replaced_text = text;
                     replaced_text.replace(start, length, replace_str);
                     IsPass = false;
@@ -564,21 +526,17 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
 {
     ReviewWordsResult result;
     bool is_pass = true;
-    // ?List
+    // 初始化规则id(List)
     ReviewWordsRegularId RegularId;
-    //
-    // shield
+    // 循环遍历
     for (auto& regex_type : filter.RegexList) {
-        // ??
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Shield) {
             for (auto& regex : regex_type.RegexList) {
-                // ??
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
                     // д: shield
@@ -590,15 +548,12 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
         else if (RegexType == SensitiveWordConstResult::Intercept)
         {
             for (auto& regex : regex_type.RegexList) {
-                // ??
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
-                    // д
                     is_pass = false;
                     RegularId.Intercept.push_back(RegexID);
                 }
@@ -606,15 +561,12 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
         }
         else if (RegexType == SensitiveWordConstResult::Replace) {
             for (auto& regex : regex_type.RegexList) {
-                // ??
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
                 if (rc > 0) {
-                    // д
                     is_pass = false;
                     RegularId.Replace.push_back(RegexID);
                 }
@@ -640,7 +592,6 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
 
 ReviewWordsResult reviewWords_Request(const std::string& content, const std::string& level = "0", const std::string& channel = "item_comment", SensitiveWordFilter& filter = sensitive_word_filter_g79)
 {
-    // ??
     std::string text = "level=" + level + "_channel=" + channel + "_content=" + content;
     ReviewWordsResult RequestResult = reviewWords(text,content, filter);
     if (RequestResult.code == 0) {
@@ -650,12 +601,10 @@ ReviewWordsResult reviewWords_Request(const std::string& content, const std::str
     else {
         RequestResult.OriginalContent = content;
         if (RequestResult.ReplaceContent.find("level=" + level + "_channel=" + channel + "_content=") == std::string::npos) {
-            // ??"*"???β
             size_t pos = RequestResult.ReplaceContent.find("*");
             if (pos != std::string::npos) {
                 RequestResult.ReplaceContent = RequestResult.ReplaceContent.substr(pos);
             } else {
-                // ??"*"???
                 RequestResult.ReplaceContent = std::string(content.length(), '*');
             }
         }
@@ -672,18 +621,15 @@ ReviewWordsResult reviewWords_Request(const std::string& content, const std::str
 }
 
 std::atomic<bool> should_refresh_sensitive_words(true);
-// ?????????д???????
 void schedule_sensitive_word_refresh() {
     std::thread([]() {
         while (true) {
-            // ???1С????????????????????д??
             std::this_thread::sleep_for(std::chrono::hours(1));
 
             if (should_refresh_sensitive_words.load()) {
                 std::cout << "Refresh Sensitive words" << std::endl;
 
                 try {
-                    // ???????????д??
                     init_sensitive_word(sensitive_word_filter_g79, "g79");
                     init_sensitive_word(sensitive_word_filter_x19, "x19");
 
@@ -701,11 +647,10 @@ int main(int argc, char** argv) {
     // init sensitive_word
     init_sensitive_word(sensitive_word_filter_g79, "g79");
     init_sensitive_word(sensitive_word_filter_x19, "x19");
-    // ??
+    // 初始化刷新
     schedule_sensitive_word_refresh();
     httplib::Server svr;
 
-    // ·???
     svr.Get("/", [](const httplib::Request& req, httplib::Response& res) {
         res.set_content("Hello World!", "text/plain");
     });
@@ -714,25 +659,19 @@ int main(int argc, char** argv) {
     svr.Post("/g79/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
-            // ?
             std::string content = req.body;
-            // ?json
             nlohmann::json json_content = nlohmann::json::parse(content);
-            // ?
             std::string level = json_content["level"];
             std::string channel = json_content["channel"];
             std::string word = json_content["word"];
 
-            // 麯
             ReviewWordsResult result = reviewWords_Request(word, level, channel, sensitive_word_filter_g79);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
-            // ?JSON
             nlohmann::json response_json;
             response_json["code"] = result.code;
             response_json["message"] = result.message;
 
-            // лregularIdList
             nlohmann::json regular_id_list_json;
             regular_id_list_json["Shield"] = nlohmann::json::array();
             regular_id_list_json["Intercept"] = nlohmann::json::array();
@@ -753,13 +692,11 @@ int main(int argc, char** argv) {
             response_json["regularIdList"] = regular_id_list_json;
             response_json["ReplaceContent"] = result.ReplaceContent;
             response_json["OriginalContent"] = result.OriginalContent;
-
-            // ?
+            
             std::string response_str = response_json.dump();
             //std::cout << "Response JSON: " << response_str << std::endl;
             res.set_content(response_str, "application/json");
         } catch (const std::exception& e) {
-            //
             std::cerr << "Error processing request: " << e.what() << std::endl;
             nlohmann::json error_json;
             error_json["code"] = 500;
@@ -772,18 +709,13 @@ int main(int argc, char** argv) {
     svr.Post("/g79/review/nickname", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
-            // ?
             std::string content = req.body;
-            // ?json
             nlohmann::json json_content = nlohmann::json::parse(content);
-            // ?
             std::string NickName = json_content["nickname"];
 
-            // 麯
             ReviewNickNameResult result = reviewNickName(NickName, sensitive_word_filter_g79);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
-            // ?JSON
             nlohmann::json response_json;
             response_json["code"] = result.code;
             response_json["message"] = result.message;
@@ -791,12 +723,10 @@ int main(int argc, char** argv) {
             response_json["OriginalNickName"] = result.OriginalNickName;
             response_json["ReplaceNickName"] = result.ReplaceNickName;
 
-            // ?
             std::string response_str = response_json.dump();
             //std::cout << "Response JSON: " << response_str << std::endl;
             res.set_content(response_str, "application/json");
         } catch (const std::exception& e) {
-            //
             std::cerr << "Error processing request: " << e.what() << std::endl;
             nlohmann::json error_json;
             error_json["code"] = 500;
@@ -810,25 +740,19 @@ int main(int argc, char** argv) {
     svr.Post("/x19/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
-            // ?
             std::string content = req.body;
-            // ?json
             nlohmann::json json_content = nlohmann::json::parse(content);
-            // ?
             std::string level = json_content["level"];
             std::string channel = json_content["channel"];
             std::string word = json_content["word"];
 
-            // 麯
             ReviewWordsResult result = reviewWords_Request(word, level, channel, sensitive_word_filter_x19);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
-            // ?JSON
             nlohmann::json response_json;
             response_json["code"] = result.code;
             response_json["message"] = result.message;
 
-            // лregularIdList
             nlohmann::json regular_id_list_json;
             regular_id_list_json["Shield"] = nlohmann::json::array();
             regular_id_list_json["Intercept"] = nlohmann::json::array();
@@ -868,18 +792,13 @@ int main(int argc, char** argv) {
     svr.Post("/x19/review/nickname", [](const httplib::Request& req, httplib::Response& res) {
         try {
             // POST
-            // ?
             std::string content = req.body;
-            // ?json
             nlohmann::json json_content = nlohmann::json::parse(content);
-            // ?
             std::string NickName = json_content["nickname"];
 
-            // 麯
             ReviewNickNameResult result = reviewNickName(NickName, sensitive_word_filter_x19);
             //std::cout << "content: " << content << " Result:" << result.code <<std::endl;
 
-            // ?JSON
             nlohmann::json response_json;
             response_json["code"] = result.code;
             response_json["message"] = result.message;
@@ -887,12 +806,10 @@ int main(int argc, char** argv) {
             response_json["OriginalNickName"] = result.OriginalNickName;
             response_json["ReplaceNickName"] = result.ReplaceNickName;
 
-            // ?
             std::string response_str = response_json.dump();
             //std::cout << "Response JSON: " << response_str << std::endl;
             res.set_content(response_str, "application/json");
         } catch (const std::exception& e) {
-            // 
             std::cerr << "Error processing request: " << e.what() << std::endl;
             nlohmann::json error_json;
             error_json["code"] = 500;
@@ -902,7 +819,7 @@ int main(int argc, char** argv) {
         }
     });
     
-    // 
+    // 监听端口:8143
     svr.listen("0.0.0.0", 8143);
     return 0;
 }
