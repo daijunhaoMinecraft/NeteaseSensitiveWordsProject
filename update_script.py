@@ -1,4 +1,8 @@
-# update_script.py from Qwen GPT
+# update_script.py
+# 功能：自动解密网易敏感词配置并更新到 GitHub 仓库
+# 作者：Qwen + 你
+# 用途：配合 GitHub Actions 自动化运行
+
 import re
 import json
 import base64
@@ -43,6 +47,7 @@ def decrypt_content(encrypted_content: bytes, key: str) -> dict:
 
 def get_file_sha(owner: str, repo: str, path: str, token: str, branch: str = "main") -> str | None:
     """获取文件当前 SHA（用于更新）"""
+    # 🔴 修复：删除了 URL 中多余的空格
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -73,6 +78,7 @@ def update_github_file(
     commit_msg: str = "Auto update file"
 ):
     """通过 GitHub API 创建或更新文件"""
+    # 🔴 修复：删除了 URL 中多余的空格
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{filepath}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -99,7 +105,10 @@ def update_github_file(
         return True
     else:
         print(f"[ERROR] 更新失败 {filepath}: {resp.status_code}")
-        print(resp.json())
+        try:
+            print(resp.json())
+        except:
+            print(resp.text)
         return False
 
 def main():
@@ -125,31 +134,44 @@ def main():
             "network": "wifi",
             "info": {}
         }
-        build_json_g79 = {build_json_x19}
+
+        # ✅ 修复：正确复制字典，而不是 {dict} 创建 set
+        build_json_g79 = build_json_x19.copy()  # 或 dict(build_json_x19)
         build_json_g79["gameid"] = "g79"
 
-        # 获取 URL
+        # 获取 x19 URL
         x19_resp = requests.post(
             "http://optsdk.gameyw.netease.com/initbox_x19.html",
             data=base64.b64encode(json.dumps(build_json_x19).encode('utf-8')).decode('utf-8'),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             verify=False
         )
-        x19_url = x19_resp.json()["url"]
+        x19_resp.raise_for_status()  # 检查 HTTP 错误
+        x19_data = x19_resp.json()
+        if "url" not in x19_data:
+            raise Exception(f"响应中无 'url' 字段: {x19_data}")
+        x19_url = x19_data["url"]
 
+        # 获取 g79 URL
         g79_resp = requests.post(
             "http://optsdk.gameyw.netease.com/initbox_g79.html",
             data=base64.b64encode(json.dumps(build_json_g79).encode('utf-8')).decode('utf-8'),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             verify=False
         )
-        g79_url = g79_resp.json()["url"]
+        g79_resp.raise_for_status()
+        g79_data = g79_resp.json()
+        if "url" not in g79_data:
+            raise Exception(f"响应中无 'url' 字段: {g79_data}")
+        g79_url = g79_data["url"]
 
         # 下载加密内容
+        print("[*] 下载加密文件...")
         x19_encrypted = requests.get(x19_url, verify=False).content
         g79_encrypted = requests.get(g79_url, verify=False).content
 
         # 解密
+        print("[*] 解密中...")
         x19_data = decrypt_content(x19_encrypted, "c42bf7f39d479999")
         g79_data = decrypt_content(g79_encrypted, "c42bf7f39d476db3")
 
@@ -158,6 +180,7 @@ def main():
         g79_content = json.dumps(g79_data, ensure_ascii=False, indent=4)
 
         # --- 更新到 GitHub ---
+        print("[*] 正在更新 GitHub 文件...")
         success1 = update_github_file(
             owner=GITHUB_OWNER,
             repo=GITHUB_REPO,
@@ -165,7 +188,7 @@ def main():
             content=x19_content,
             token=GITHUB_TOKEN,
             branch=GITHUB_BRANCH,
-            commit_msg="Auto update X19 sensitive words"
+            commit_msg="🤖 Auto update X19 sensitive words"
         )
 
         success2 = update_github_file(
@@ -175,15 +198,21 @@ def main():
             content=g79_content,
             token=GITHUB_TOKEN,
             branch=GITHUB_BRANCH,
-            commit_msg="Auto update G79 sensitive words"
+            commit_msg="🤖 Auto update G79 sensitive words"
         )
 
         if success1 and success2:
-            print("\n所有文件更新成功！")
+            print("\n🎉 所有文件更新成功！")
         else:
-            print("\n更新失败，请检查日志。")
+            print("\n❌ 更新失败，请检查日志。")
             exit(1)
 
+    except requests.exceptions.RequestException as e:
+        print(f"\n[NETWORK ERROR] 网络请求失败: {e}")
+        exit(1)
+    except json.JSONDecodeError as e:
+        print(f"\n[JSON ERROR] JSON 解析失败: {e}")
+        exit(1)
     except Exception as e:
         print(f"\n[CRITICAL] 执行失败: {e}")
         exit(1)
