@@ -1,10 +1,9 @@
-# .github/workflows/update-sensitive-words.yml
 name: 🔄 Auto Update Sensitive Words
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 每天 UTC 3:00（北京时间 11:00）
-  workflow_dispatch:     # 允许手动触发
+    - cron: '0 3 * * *'  # 每天 UTC 3:00
+  workflow_dispatch:
 
 jobs:
   update:
@@ -25,10 +24,17 @@ jobs:
 
       - name: 📦 Install Dependencies
         run: |
-          pip install requests pycryptodome
+          pip install requests pycryptodome deepdiff
 
       - name: 🚀 Run Update Script
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python update_script.py
+
+      - name: 📤 Commit and Push Changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .
+          git diff --cached --exit-code || (git commit -m "🤖 Auto update: changes detected" && git push)
