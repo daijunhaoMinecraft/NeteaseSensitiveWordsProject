@@ -1,6 +1,6 @@
 # 网易我的世界敏感词检测
 
-**CPP代码是自己写的，文档是Claude4+人工修改的，Python脚本解密是Gemini写的，Github Actions刷新敏感词是Qwen(千问)写的**
+**CPP代码是自己写的，文档是Claude4+人工修改的，Python脚本解密是Gemini写的，Github Actions刷新敏感词是Qwen(千问)写的**<br/>
 一个基于 C++ 开发的高性能敏感词过滤 HTTP 服务，支持多PC敏感词检测(X19)和PE敏感词检测(G79)，每小时自动更新，词库来源于网易我的世界，解密来源于IDA Pro → libenvsdk
 
 ## 功能特性
