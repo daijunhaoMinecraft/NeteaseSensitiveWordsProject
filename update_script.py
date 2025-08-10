@@ -7,7 +7,10 @@ from Crypto.Cipher import ARC4
 import os
 
 def decode_pcre_unicode_in_obj(obj):
-    """递归解码 PCRE 风格的 \x{...} Unicode 转义"""
+    """
+    Recursively decode strings with PCRE-style Unicode escape sequences (e.g., \\x{abcd}).
+    递归处理对象中的字符串，将形如 \\x{abcd} 的 Unicode 转义替换为对应字符。
+    """
     if isinstance(obj, dict):
         return {k: decode_pcre_unicode_in_obj(v) for k, v in obj.items()}
     elif isinstance(obj, list):
