@@ -149,7 +149,7 @@ def diff_path_to_value(diff, path, old=False):
 def generate_changes_report(differences):
     """
     生成统一的变化报告
-    :param differences: [(filename, diff_dict), ...]
+    :param differences: [(filename, diff_dict), ...]，其中 diff_dict 是 DeepDiff 对象
     """
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -168,12 +168,15 @@ def generate_changes_report(differences):
         json_changes = []
 
         for filename, diff in differences:
+            # ✅ 关键修复：使用 to_dict() 转为原生字典
+            diff_dict = diff.to_dict() if hasattr(diff, 'to_dict') else dict(diff)
+
             md_content += f"## 📄 `{filename}`\n\n"
-            json_change = {"file": filename, "diff": dict(diff)}
+            json_change = {"file": filename, "diff": diff_dict}
             has_change = False
 
             # 新增
-            added = diff.get("dictionary_item_added", [])
+            added = diff_dict.get("dictionary_item_added", [])
             if added:
                 md_content += "### ➕ 新增规则\n"
                 for item in added:
@@ -182,7 +185,7 @@ def generate_changes_report(differences):
                 has_change = True
 
             # 删除
-            removed = diff.get("dictionary_item_removed", [])
+            removed = diff_dict.get("dictionary_item_removed", [])
             if removed:
                 md_content += "### ❌ 删除规则\n"
                 for item in removed:
@@ -191,7 +194,7 @@ def generate_changes_report(differences):
                 has_change = True
 
             # 修改
-            changed = diff.get("values_changed", {})
+            changed = diff_dict.get("values_changed", {})
             if changed:
                 md_content += "### 🔁 修改规则\n"
                 for key, change in changed.items():
@@ -202,7 +205,7 @@ def generate_changes_report(differences):
                 has_change = True
 
             # 类型变更
-            type_changed = diff.get("type_changes", {})
+            type_changed = diff_dict.get("type_changes", {})
             if type_changed:
                 md_content += "### ⚠️ 类型变更\n"
                 for key, change in type_changed.items():
@@ -223,11 +226,12 @@ def generate_changes_report(differences):
             "changes": json_changes
         }
 
-    # 写入文件
+    # ✅ 写入文件
     with open(CHANGELOG_MD, "w", encoding="utf-8") as f:
         f.write(md_content)
 
     with open(CHANGELOG_JSON, "w", encoding="utf-8") as f:
+        # ✅ 确保 JSON 可序列化
         json.dump(json_report, f, ensure_ascii=False, indent=4)
 
     print(f"[INFO] 变化报告已生成：{CHANGELOG_MD} 和 {CHANGELOG_JSON}")
