@@ -34,7 +34,19 @@ jobs:
 
       - name: 📤 Commit and Push Changes
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add .
-          git diff --cached --exit-code || (git commit -m "🤖 Auto update: changes detected" && git push)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # 检查是否有文件被修改或新增
+          if ! git diff --quiet; then
+            echo "Changes detected. Committing and pushing..."
+            git add .
+            git commit -m "🤖 Auto update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            
+            # 在推送前拉取并变基，防止冲突
+            git pull --rebase
+            
+            git push
+          else
+            echo "No changes detected. Nothing to commit."
+          fi
