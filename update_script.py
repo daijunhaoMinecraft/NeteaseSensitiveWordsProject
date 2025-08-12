@@ -8,7 +8,6 @@ import base64
 import requests
 from Crypto.Cipher import ARC4
 import os
-from deepdiff import DeepDiff
 from hashlib import md5
 from datetime import datetime
 
@@ -78,52 +77,69 @@ def save_cache(x19_url, g79_url, x19_hash, g79_hash):
 
 def hash_json(data):
     """生成 JSON 内容的稳定哈希"""
-    return md5(json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+    # 排序键以确保哈希的稳定性
+    sorted_data = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    return md5(sorted_data.encode('utf-8')).hexdigest()
 
-def compare_words_by_content(old_data, new_data):
+# 【修复】重构对比函数，使其能处理所有 regex 子类别
+def compare_data_by_content(old_data, new_data):
     """
-    通过比较正则表达式的内容而不是不稳定的ID来找出差异。
-    返回一个包含'added', 'removed', 'modified'的字典。
+    通过比较正则表达式的内容而不是不稳定的ID来找出所有类别的差异。
+    这个函数现在是唯一的对比引擎。
     """
-    changes = {"added": [], "removed": [], "modified": {}}
-
-    old_regex_dict = old_data.get("regex", {}).get("nickname", {})
-    new_regex_dict = new_data.get("regex", {}).get("nickname", {})
-
-    old_content_to_id = {v: k for k, v in old_regex_dict.items()}
-    new_content_to_id = {v: k for k, v in new_regex_dict.items()}
-
-    old_contents = set(old_content_to_id.keys())
-    new_contents = set(new_content_to_id.keys())
-
-    added_contents = new_contents - old_contents
-    removed_contents = old_contents - new_contents
-
-    for content in sorted(list(added_contents)):
-        changes["added"].append({"id": new_content_to_id[content], "value": content})
-
-    for content in sorted(list(removed_contents)):
-        changes["removed"].append({"id": old_content_to_id[content], "value": content})
-
-    old_data_copy = json.loads(json.dumps(old_data))
-    new_data_copy = json.loads(json.dumps(new_data))
-    if "nickname" in old_data_copy.get("regex", {}): del old_data_copy["regex"]["nickname"]
-    if "nickname" in new_data_copy.get("regex", {}): del new_data_copy["regex"]["nickname"]
-    
-    other_diffs = DeepDiff(old_data_copy, new_data_copy, ignore_order=True)
-    if other_diffs:
-        changes["modified"] = other_diffs.to_dict()
-
-    if not changes["added"] and not changes["removed"] and not changes["modified"]:
+    # 检查哈希值，如果哈希相同，则内容完全相同，直接返回
+    if hash_json(old_data) == hash_json(new_data):
         return None
-    
-    return changes
 
-# 【修复】现在只有在有变化时才写入文件
+    all_changes = {}
+
+    old_regex_root = old_data.get("regex", {})
+    new_regex_root = new_data.get("regex", {})
+
+    # 获取所有需要对比的类别（例如 nickname, shield, all 等）
+    all_categories = set(old_regex_root.keys()) | set(new_regex_root.keys())
+
+    for category in sorted(list(all_categories)):
+        old_dict = old_regex_root.get(category, {})
+        new_dict = new_regex_root.get(category, {})
+
+        # 确保我们处理的是字典
+        if not isinstance(old_dict, dict) or not isinstance(new_dict, dict):
+            continue
+
+        # 创建从 regex 内容到 ID 的反向映射
+        old_content_to_id = {v: k for k, v in old_dict.items()}
+        new_content_to_id = {v: k for k, v in new_dict.items()}
+
+        old_contents = set(old_content_to_id.keys())
+        new_contents = set(new_content_to_id.keys())
+
+        added_contents = new_contents - old_contents
+        removed_contents = old_contents - new_contents
+        
+        category_changes = {}
+        if added_contents:
+            category_changes["added"] = sorted(
+                [{"id": new_content_to_id[c], "value": c} for c in added_contents],
+                key=lambda x: str(x['id'])
+            )
+        if removed_contents:
+            category_changes["removed"] = sorted(
+                [{"id": old_content_to_id[c], "value": c} for c in removed_contents],
+                key=lambda x: str(x['id'])
+            )
+        
+        if category_changes:
+            all_changes[category] = category_changes
+
+    return all_changes if all_changes else None
+
+
+# 【修复】更新报告生成函数以适应新的差异结构
 def generate_and_save_report(differences):
     """
     根据差异生成报告。只有在有实际变化时才写入文件。
-    :param differences: [(filename, diff_dict, old_data, new_data), ...]
+    :param differences: [(filename, diff_dict), ...]
     :return: (bool) 是否生成了新报告
     """
     if not any(d[1] for d in differences):
@@ -135,56 +151,34 @@ def generate_and_save_report(differences):
     md_content += "本次检测到以下文件发生变化：\n\n"
     json_changes = []
 
-    for filename, diff_dict, old_data, new_data in differences:
+    for filename, diff_dict in differences:
         if not diff_dict: continue
 
         md_content += f"## 📄 `{filename}`\n\n"
-        json_change = {"file": filename, "diff": diff_dict}
-        has_change_in_file = False
+        json_changes.append({"file": filename, "diff": diff_dict})
 
-        added = diff_dict.get("added", [])
-        if added:
-            md_content += "### ➕ 新增规则 (by content)\n"
-            for item in added:
-                md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
-            md_content += "\n"
-            has_change_in_file = True
+        for category, changes in sorted(diff_dict.items()):
+            md_content += f"### 类别: `{category}`\n\n"
+            
+            added = changes.get("added", [])
+            if added:
+                md_content += "#### ➕ 新增规则\n"
+                for item in added:
+                    md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
+                md_content += "\n"
 
-        removed = diff_dict.get("removed", [])
-        if removed:
-            md_content += "### ❌ 删除规则 (by content)\n"
-            for item in removed:
-                md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
-            md_content += "\n"
-            has_change_in_file = True
-
-        modified = diff_dict.get("modified", {})
-        if modified:
-            md_content += "### 🔁 修改其他字段\n"
-            changed = modified.get("values_changed", {})
-            for key, change in changed.items():
-                old = change.get('old_value', 'N/A')
-                new = change.get('new_value', 'N/A')
-                md_content += f"- `{key}`: `{old}` → `{new}`\n"
-            md_content += "\n"
-            has_change_in_file = True
-
-        if not has_change_in_file:
-            md_content += "ℹ️ 无显著变化。\n\n"
-
-        json_changes.append(json_change)
-
-    json_report = {
-        "timestamp": datetime.now().isoformat(),
-        "total_files_changed": len(json_changes),
-        "changes": json_changes
-    }
+            removed = changes.get("removed", [])
+            if removed:
+                md_content += "#### ❌ 删除规则\n"
+                for item in removed:
+                    md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
+                md_content += "\n"
 
     print(f"[INFO] 检测到变化，正在生成报告文件：{CHANGELOG_MD} 和 {CHANGELOG_JSON}")
     with open(CHANGELOG_MD, "w", encoding="utf-8") as f:
         f.write(md_content)
     with open(CHANGELOG_JSON, "w", encoding="utf-8") as f:
-        json.dump(json_report, f, ensure_ascii=False, indent=4)
+        json.dump(json_changes, f, ensure_ascii=False, indent=4)
     
     return True
 
@@ -222,14 +216,11 @@ def main():
         x19_url = get_url("x19")
         g79_url = get_url("g79")
         
-        # --- 检查 URL 是否变化 ---
         if x19_url == cache.get("x19_url") and g79_url == cache.get("g79_url"):
             print("[INFO] URLs 未变化，无需更新。")
             return
 
         print("[*] URLs 发生变化，准备下载新内容...")
-
-        # --- 下载并解密 ---
         x19_data = decrypt_content(session.get(x19_url, verify=False).content, "c42bf7f39d479999")
         g79_data = decrypt_content(session.get(g79_url, verify=False).content, "c42bf7f39d476db3")
 
@@ -237,14 +228,14 @@ def main():
         new_g79_hash = hash_json(g79_data)
 
         # --- 对比内容 ---
-        all_data = [
-            ("X19SensitiveWords.json", x19_data),
-            ("G79SensitiveWords.json", g79_data),
+        has_content_changed = False
+        all_data_to_check = [
+            ("X19SensitiveWords.json", x19_data, new_x19_hash),
+            ("G79SensitiveWords.json", g79_data, new_g79_hash),
         ]
 
-        has_content_changed = False
-        for name, new_data in all_data:
-            old_data = None
+        for name, new_data, new_hash in all_data_to_check:
+            old_data = {}
             if os.path.exists(name):
                 try:
                     with open(name, "r", encoding="utf-8") as f:
@@ -252,17 +243,17 @@ def main():
                 except Exception as e:
                     print(f"[WARN] 无法读取旧文件 {name}: {e}")
             
-            diff = compare_words_by_content(old_data or {}, new_data)
+            # 【核心变更】使用新的对比函数
+            diff = compare_data_by_content(old_data, new_data)
 
             if diff:
                 print(f"[*] {name} 内容发生变化！")
                 files_to_update.append((name, new_data))
-                differences.append((name, diff, old_data, new_data))
+                differences.append((name, diff))
                 has_content_changed = True
             else:
                 print(f"[INFO] {name} 内容未发生实质性变化。")
-                differences.append((name, None, old_data, new_data))
-        
+
         # --- 根据是否有变化来生成报告并更新文件 ---
         if has_content_changed:
             generate_and_save_report(differences)
@@ -278,7 +269,6 @@ def main():
             print("\n🎉 脚本执行完毕，检测到内容更新。")
         else:
             print("[INFO] 所有文件均无实质变化，无需更新文件或报告。")
-            # 即使内容没变，URL也可能变了，所以依然要保存新URL的缓存
             save_cache(x19_url, g79_url, new_x19_hash, new_g79_hash)
 
     except Exception as e:
