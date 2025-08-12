@@ -8,7 +8,6 @@ import base64
 import requests
 from Crypto.Cipher import ARC4
 import os
-from deepdiff import DeepDiff
 from hashlib import md5
 from datetime import datetime
 
@@ -57,7 +56,6 @@ def load_cache():
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            # 补全缺失字段
             for key in ["x19_url", "g79_url", "x19_hash", "g79_hash"]:
                 if key not in data:
                     data[key] = None
@@ -79,345 +77,200 @@ def save_cache(x19_url, g79_url, x19_hash, g79_hash):
 
 def hash_json(data):
     """生成 JSON 内容的稳定哈希"""
-    return md5(json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+    # 排序键以确保哈希的稳定性
+    sorted_data = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    return md5(sorted_data.encode('utf-8')).hexdigest()
 
-def get_file_sha(owner, repo, path, token, branch="main"):
-    """获取文件当前 SHA"""
-    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    params = {"ref": branch}
-    try:
-        resp = requests.get(url, headers=headers, params=params)
-        if resp.status_code == 200:
-            return resp.json()["sha"]
-        elif resp.status_code == 404:
-            return None
-        else:
-            print(f"[ERROR] 获取 SHA 失败: {resp.status_code}")
-            return None
-    except Exception as e:
-        print(f"[ERROR] 请求失败: {e}")
+# 【修复】重构对比函数，使其能处理所有 regex 子类别
+def compare_data_by_content(old_data, new_data):
+    """
+    通过比较正则表达式的内容而不是不稳定的ID来找出所有类别的差异。
+    这个函数现在是唯一的对比引擎。
+    """
+    # 检查哈希值，如果哈希相同，则内容完全相同，直接返回
+    if hash_json(old_data) == hash_json(new_data):
         return None
 
-def update_github_file(owner, repo, filepath, content, token, branch="main", commit_msg="Auto update"):
-    """创建或更新 GitHub 文件"""
-    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{filepath}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+    all_changes = {}
 
-    sha = get_file_sha(owner, repo, filepath, token, branch)
-    encoded_content = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-    payload = {"message": commit_msg, "content": encoded_content, "branch": branch}
-    if sha:
-        payload["sha"] = sha
+    old_regex_root = old_data.get("regex", {})
+    new_regex_root = new_data.get("regex", {})
 
-    resp = requests.put(url, headers=headers, json=payload)
-    if resp.status_code in (200, 201):
-        print(f"[SUCCESS] 成功更新 {filepath}")
-        return True
-    else:
-        print(f"[ERROR] 更新失败 {filepath}: {resp.status_code}")
-        try:
-            print(resp.json())
-        except:
-            print(resp.text)
+    # 获取所有需要对比的类别（例如 nickname, shield, all 等）
+    all_categories = set(old_regex_root.keys()) | set(new_regex_root.keys())
+
+    for category in sorted(list(all_categories)):
+        old_dict = old_regex_root.get(category, {})
+        new_dict = new_regex_root.get(category, {})
+
+        # 确保我们处理的是字典
+        if not isinstance(old_dict, dict) or not isinstance(new_dict, dict):
+            continue
+
+        # 创建从 regex 内容到 ID 的反向映射
+        old_content_to_id = {v: k for k, v in old_dict.items()}
+        new_content_to_id = {v: k for k, v in new_dict.items()}
+
+        old_contents = set(old_content_to_id.keys())
+        new_contents = set(new_content_to_id.keys())
+
+        added_contents = new_contents - old_contents
+        removed_contents = old_contents - new_contents
+        
+        category_changes = {}
+        if added_contents:
+            category_changes["added"] = sorted(
+                [{"id": new_content_to_id[c], "value": c} for c in added_contents],
+                key=lambda x: str(x['id'])
+            )
+        if removed_contents:
+            category_changes["removed"] = sorted(
+                [{"id": old_content_to_id[c], "value": c} for c in removed_contents],
+                key=lambda x: str(x['id'])
+            )
+        
+        if category_changes:
+            all_changes[category] = category_changes
+
+    return all_changes if all_changes else None
+
+
+# 【修复】更新报告生成函数以适应新的差异结构
+def generate_and_save_report(differences):
+    """
+    根据差异生成报告。只有在有实际变化时才写入文件。
+    :param differences: [(filename, diff_dict), ...]
+    :return: (bool) 是否生成了新报告
+    """
+    if not any(d[1] for d in differences):
+        print("[INFO] 未检测到任何内容变化，跳过生成报告。")
         return False
 
-# 【修复】函数现在接收原始数据字典(data_obj)来查找值
-def diff_path_to_value(data_obj, path):
-    """
-    从 deepdiff 路径(e.g., "root['key'][0]")在给定的数据对象中提取值用于显示。
-    """
-    try:
-        # 【优化】更稳健的路径解析
-        keys = re.findall(r"\[\'(.*?)\'\]|\[(\d+)\]", path)
-        value = data_obj
-        for key_tuple in keys:
-            key_str, key_int_str = key_tuple
-            key = key_str if key_str else int(key_int_str)
-
-            if isinstance(value, dict):
-                value = value.get(key)
-            elif isinstance(value, list) and isinstance(key, int):
-                value = value[key]
-            else:
-                return "路径解析失败" # Path parsing failed
-        return str(value)[:200]  # 截断过长内容
-    except Exception as e:
-        print(f"[DEBUG] diff_path_to_value failed for path '{path}': {e}")
-        return "值提取失败" # Value extraction failed
-
-# 【修复】函数签名和内部逻辑已更新
-def generate_changes_report(differences):
-    """
-    生成统一的变化报告
-    :param differences: [(filename, diff_obj, old_data, new_data), ...]
-    """
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    md_content = f"# 📝 敏感词更新报告 - {timestamp}\n\n"
+    md_content += "本次检测到以下文件发生变化：\n\n"
+    json_changes = []
 
-    if not any(d[1] for d in differences): # 检查是否有实际的 diff 对象
-        md_content = f"# 📝 敏感词更新报告 - {timestamp}\n\n✅ 本次运行未检测到任何内容变化。\n"
-        json_report = {
-            "timestamp": datetime.now().isoformat(),
-            "total_files_changed": 0,
-            "changes": []
-        }
-    else:
-        md_content = f"# 📝 敏感词更新报告 - {timestamp}\n\n"
-        md_content += "本次检测到以下文件发生变化：\n\n"
-        json_changes = []
+    for filename, diff_dict in differences:
+        if not diff_dict: continue
 
-        # 【修复】解包元组以获取 old_data 和 new_data
-        for filename, diff, old_data, new_data in differences:
-            if not diff: continue # 如果没有差异，跳过
+        md_content += f"## 📄 `{filename}`\n\n"
+        json_changes.append({"file": filename, "diff": diff_dict})
 
-            diff_dict = diff.to_dict()
-
-            # 【修复】将 diff_dict 中的 set-like 对象转换为 list，使其可以被 JSON 序列化
-            serializable_diff_dict = {}
-            for key, value in diff_dict.items():
-                if isinstance(value, (set, frozenset)) or type(value).__name__ == 'SetOrdered':
-                    # 排序以获得一致的输出
-                    try:
-                        serializable_diff_dict[key] = sorted(list(value))
-                    except TypeError: # 如果元素不可排序
-                        serializable_diff_dict[key] = list(value)
-                else:
-                    serializable_diff_dict[key] = value
-
-            md_content += f"## 📄 `{filename}`\n\n"
-            json_change = {"file": filename, "diff": serializable_diff_dict}
-            has_change = False
-
-            # 新增
-            added = diff_dict.get("dictionary_item_added", [])
+        for category, changes in sorted(diff_dict.items()):
+            md_content += f"### 类别: `{category}`\n\n"
+            
+            added = changes.get("added", [])
             if added:
-                md_content += "### ➕ 新增规则\n"
+                md_content += "#### ➕ 新增规则\n"
                 for item in added:
-                    # 【修复】从 new_data 中查找新增的值
-                    value_str = diff_path_to_value(new_data, item)
-                    md_content += f"- `{item}`: {value_str}\n"
+                    md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
                 md_content += "\n"
-                has_change = True
 
-            # 删除
-            removed = diff_dict.get("dictionary_item_removed", [])
+            removed = changes.get("removed", [])
             if removed:
-                md_content += "### ❌ 删除规则\n"
+                md_content += "#### ❌ 删除规则\n"
                 for item in removed:
-                    # 【修复】从 old_data 中查找被删除的值
-                    value_str = diff_path_to_value(old_data, item)
-                    md_content += f"- `{item}`: {value_str}\n"
+                    md_content += f"- **ID `{item['id']}`**: `{item['value'][:200]}`\n"
                 md_content += "\n"
-                has_change = True
 
-            # 修改
-            changed = diff_dict.get("values_changed", {})
-            if changed:
-                md_content += "### 🔁 修改规则\n"
-                for key, change in changed.items():
-                    old = change.get('old_value', 'N/A')
-                    new = change.get('new_value', 'N/A')
-                    md_content += f"- `{key}`: `{old}` → `{new}`\n"
-                md_content += "\n"
-                has_change = True
-
-            # 类型变更
-            type_changed = diff_dict.get("type_changes", {})
-            if type_changed:
-                md_content += "### ⚠️ 类型变更\n"
-                for key, change in type_changed.items():
-                    old_t = change.get('old_type', 'N/A')
-                    new_t = change.get('new_type', 'N/A')
-                    md_content += f"- `{key}`: `{old_t}` → `{new_t}`\n"
-                md_content += "\n"
-                has_change = True
-
-            if not has_change:
-                md_content += "ℹ️ 无显著变化（可能为顺序调整或未跟踪的类型）\n\n"
-
-            json_changes.append(json_change)
-
-        json_report = {
-            "timestamp": datetime.now().isoformat(),
-            "total_files_changed": len(json_changes),
-            "changes": json_changes
-        }
-
+    print(f"[INFO] 检测到变化，正在生成报告文件：{CHANGELOG_MD} 和 {CHANGELOG_JSON}")
     with open(CHANGELOG_MD, "w", encoding="utf-8") as f:
         f.write(md_content)
-
     with open(CHANGELOG_JSON, "w", encoding="utf-8") as f:
-        json.dump(json_report, f, ensure_ascii=False, indent=4)
-
-    print(f"[INFO] 变化报告已生成：{CHANGELOG_MD} 和 {CHANGELOG_JSON}")
+        json.dump(json_changes, f, ensure_ascii=False, indent=4)
+    
+    return True
 
 # ========== 主函数 ==========
 
 def main():
     print("[+] 开始更新敏感词数据...")
-
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-    if not GITHUB_TOKEN:
-        raise Exception("❌ GITHUB_TOKEN 未设置！请检查 Actions Secrets。")
-
+    
     cache = load_cache()
-    old_x19_url = cache.get("x19_url")
-    old_g79_url = cache.get("g79_url")
-
     files_to_update = []
-    differences = []  # 【优化】现在存储 (filename, diff_obj, old_data, new_data)
+    differences = []
 
     try:
         # --- 获取新 URL ---
-        build_json_x19 = {
-            "version": "2.4.0.161787",
-            "sys": "windows",
-            "deviceid": "AA85-636D-18B2-3937-834B-D59E",
-            "gameid": "x19",
-            "network": "wifi",
-            "info": {}
-        }
-        build_json_g79 = build_json_x19.copy()
-        build_json_g79["gameid"] = "g79"
-        
-        # 【优化】使用 requests.Session 和关闭 InsecureRequestWarning
         requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
         session = requests.Session()
         session.headers.update({"Content-Type": "application/x-www-form-urlencoded"})
+        
+        build_json = {"version": "2.4.0.161787", "sys": "windows", "deviceid": "AA85-636D-18B2-3937-834B-D59E", "network": "wifi", "info": {}}
+        
+        def get_url(game_id):
+            payload = build_json.copy()
+            payload["gameid"] = game_id
+            resp = session.post(
+                f"http://optsdk.gameyw.netease.com/initbox_{game_id}.html",
+                data=base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8'),
+                verify=False
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if "url" not in data:
+                raise Exception(f"{game_id} 响应中无 'url' 字段: {data}")
+            return data["url"]
 
-        x19_resp = session.post(
-            "http://optsdk.gameyw.netease.com/initbox_x19.html",
-            data=base64.b64encode(json.dumps(build_json_x19).encode('utf-8')).decode('utf-8'),
-            verify=False
-        )
-        x19_resp.raise_for_status()
-        x19_data_resp = x19_resp.json()
-        if "url" not in x19_data_resp:
-            raise Exception(f"响应中无 'url' 字段: {x19_data_resp}")
-        x19_url = x19_data_resp["url"]
-
-        g79_resp = session.post(
-            "http://optsdk.gameyw.netease.com/initbox_g79.html",
-            data=base64.b64encode(json.dumps(build_json_g79).encode('utf-8')).decode('utf-8'),
-            verify=False
-        )
-        g79_resp.raise_for_status()
-        g79_data_resp = g79_resp.json()
-        if "url" not in g79_data_resp:
-            raise Exception(f"响应中无 'url' 字段: {g79_data_resp}")
-        g79_url = g79_data_resp["url"]
-
-        # --- 检查 URL 是否变化 ---
-        if x19_url == old_x19_url and g79_url == old_g79_url:
+        x19_url = get_url("x19")
+        g79_url = get_url("g79")
+        
+        if x19_url == cache.get("x19_url") and g79_url == cache.get("g79_url"):
             print("[INFO] URLs 未变化，无需更新。")
-            generate_changes_report([]) # 生成空报告
             return
 
         print("[*] URLs 发生变化，准备下载新内容...")
+        x19_data = decrypt_content(session.get(x19_url, verify=False).content, "c42bf7f39d479999")
+        g79_data = decrypt_content(session.get(g79_url, verify=False).content, "c42bf7f39d476db3")
 
-        # --- 下载并解密 ---
-        x19_encrypted = session.get(x19_url, verify=False).content
-        g79_encrypted = session.get(g79_url, verify=False).content
+        new_x19_hash = hash_json(x19_data)
+        new_g79_hash = hash_json(g79_data)
 
-        x19_data = decrypt_content(x19_encrypted, "c42bf7f39d479999")
-        g79_data = decrypt_content(g79_encrypted, "c42bf7f39d476db3")
+        # --- 对比内容 ---
+        has_content_changed = False
+        all_data_to_check = [
+            ("X19SensitiveWords.json", x19_data, new_x19_hash),
+            ("G79SensitiveWords.json", g79_data, new_g79_hash),
+        ]
 
-        x19_hash = hash_json(x19_data)
-        g79_hash = hash_json(g79_data)
-
-        # --- 比较内容变化 ---
-        for name, new_data, url in [
-            ("X19SensitiveWords.json", x19_data, x19_url),
-            ("G79SensitiveWords.json", g79_data, g79_url)
-        ]:
-            old_data = None
+        for name, new_data, new_hash in all_data_to_check:
+            old_data = {}
             if os.path.exists(name):
                 try:
                     with open(name, "r", encoding="utf-8") as f:
                         old_data = json.load(f)
                 except Exception as e:
                     print(f"[WARN] 无法读取旧文件 {name}: {e}")
+            
+            # 【核心变更】使用新的对比函数
+            diff = compare_data_by_content(old_data, new_data)
 
-            if old_data is None:
-                print(f"[INFO] 首次运行或 {name} 不存在，视为新增。")
-                files_to_update.append((name, new_data, url))
-                # 【修复】为报告添加占位符
-                diff = DeepDiff({}, new_data, ignore_order=True)
-                differences.append((name, diff, {}, new_data))
+            if diff:
+                print(f"[*] {name} 内容发生变化！")
+                files_to_update.append((name, new_data))
+                differences.append((name, diff))
+                has_content_changed = True
             else:
-                diff = DeepDiff(old_data, new_data, ignore_order=True)
-                if diff:
-                    print(f"[*] {name} 内容发生变化！")
-                    files_to_update.append((name, new_data, url))
-                    # 【修复】将 old_data 和 new_data 添加到元组中
-                    differences.append((name, diff, old_data, new_data))
-                else:
-                    print(f"[INFO] {name} 内容未变化（基于结构对比），跳过。")
-                    # 【优化】即使内容不变，也添加一个空的 diff，以便报告生成器能正确处理
-                    differences.append((name, None, old_data, new_data))
+                print(f"[INFO] {name} 内容未发生实质性变化。")
 
-        # --- 生成统一变化报告 ---
-        generate_changes_report(differences)
+        # --- 根据是否有变化来生成报告并更新文件 ---
+        if has_content_changed:
+            generate_and_save_report(differences)
 
-        # --- 仅当有文件要更新时才提交 ---
-        if not files_to_update:
-            print("[INFO] 所有文件均无实质变化，无需提交。")
-            save_cache(x19_url, g79_url, x19_hash, g79_hash)
-            return
-
-        # --- 更新 GitHub 文件 ---
-        all_success = True
-        for filename, data, url in files_to_update:
-            content = json.dumps(data, ensure_ascii=False, indent=4)
-            success = update_github_file(
-                owner=GITHUB_OWNER,
-                repo=GITHUB_REPO,
-                filepath=filename,
-                content=content,
-                token=GITHUB_TOKEN,
-                branch=GITHUB_BRANCH,
-                commit_msg=f"🔄 Update {filename} (source updated)"
-            )
-            if success:
-                # 本地也写入一份，确保下次运行时 old_data 是最新的
+            # 更新敏感词文件
+            for filename, data in files_to_update:
+                content = json.dumps(data, ensure_ascii=False, indent=4)
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(content)
-            all_success &= success
-        
-        # 【优化】无论更新是否成功，都要更新 GitHub 上的报告文件
-        for report_file in [CHANGELOG_MD, CHANGELOG_JSON]:
-            if os.path.exists(report_file):
-                with open(report_file, "r", encoding="utf-8") as f:
-                    report_content = f.read()
-                update_github_file(
-                    owner=GITHUB_OWNER,
-                    repo=GITHUB_REPO,
-                    filepath=report_file,
-                    content=report_content,
-                    token=GITHUB_TOKEN,
-                    branch=GITHUB_BRANCH,
-                    commit_msg=f"📄 Update changelog for {datetime.now().strftime('%Y-%m-%d')}"
-                )
-
-        if all_success:
-            print("\n🎉 所有变更文件已成功更新！")
-            save_cache(x19_url, g79_url, x19_hash, g79_hash)
+            
+            # 保存新状态
+            save_cache(x19_url, g79_url, new_x19_hash, new_g79_hash)
+            print("\n🎉 脚本执行完毕，检测到内容更新。")
         else:
-            print("\n❌ 部分或全部文件更新失败。")
-            exit(1)
+            print("[INFO] 所有文件均无实质变化，无需更新文件或报告。")
+            save_cache(x19_url, g79_url, new_x19_hash, new_g79_hash)
 
-    except requests.exceptions.RequestException as e:
-        print(f"\n[NETWORK ERROR] 网络请求失败: {e}")
-        exit(1)
-    except json.JSONDecodeError as e:
-        print(f"\n[JSON ERROR] JSON 解析失败: {e}")
-        exit(1)
     except Exception as e:
         import traceback
         traceback.print_exc()
