@@ -113,7 +113,6 @@ def update_github_file(owner, repo, filepath, content, token, branch="main", com
         print(f"[ERROR] 更新失败 {filepath}: {resp.status_code} - {resp.text}")
         return False
 
-# 【新增】自定义对比函数，解决 ID 变化导致无法正确 diff 的问题
 def compare_words_by_content(old_data, new_data):
     """
     通过比较正则表达式的内容而不是不稳定的ID来找出差异。
@@ -121,18 +120,15 @@ def compare_words_by_content(old_data, new_data):
     """
     changes = {"added": [], "removed": [], "modified": {}}
 
-    # --- 1. 对比 regex.nickname 部分 ---
     old_regex_dict = old_data.get("regex", {}).get("nickname", {})
     new_regex_dict = new_data.get("regex", {}).get("nickname", {})
 
-    # 创建从 regex 内容到 ID 的反向映射
     old_content_to_id = {v: k for k, v in old_regex_dict.items()}
     new_content_to_id = {v: k for k, v in new_regex_dict.items()}
 
     old_contents = set(old_content_to_id.keys())
     new_contents = set(new_content_to_id.keys())
 
-    # 找出新增和删除的 regex 内容
     added_contents = new_contents - old_contents
     removed_contents = old_contents - new_contents
 
@@ -142,8 +138,6 @@ def compare_words_by_content(old_data, new_data):
     for content in sorted(list(removed_contents)):
         changes["removed"].append({"id": old_content_to_id[content], "value": content})
 
-    # --- 2. 对比文件的其余部分 ---
-    # 创建数据的深拷贝，并移除我们已手动处理的部分
     old_data_copy = json.loads(json.dumps(old_data))
     new_data_copy = json.loads(json.dumps(new_data))
     if "nickname" in old_data_copy.get("regex", {}):
@@ -151,19 +145,33 @@ def compare_words_by_content(old_data, new_data):
     if "nickname" in new_data_copy.get("regex", {}):
         del new_data_copy["regex"]["nickname"]
     
-    # 使用 DeepDiff 对比剩余的稳定结构
     other_diffs = DeepDiff(old_data_copy, new_data_copy, ignore_order=True)
     if other_diffs:
         changes["modified"] = other_diffs.to_dict()
 
-    # 如果没有任何变化，返回 None
     if not changes["added"] and not changes["removed"] and not changes["modified"]:
         return None
     
     return changes
 
+# 【新增】辅助函数，递归地使对象可被JSON序列化
+def make_json_serializable(obj):
+    """
+    Recursively convert non-serializable objects (like SetOrdered) into lists.
+    """
+    if isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [make_json_serializable(elem) for elem in obj]
+    # DeepDiff的SetOrdered和Python原生的set/frozenset都转换成list
+    if isinstance(obj, (set, frozenset)) or type(obj).__name__ == 'SetOrdered':
+        try:
+            return sorted(list(obj))
+        except TypeError: # 如果集合内元素不可排序
+            return list(obj)
+    return obj
 
-# 【修复】更新报告生成函数以适应新的差异结构
+# 【修复】更新报告生成函数以正确处理所有类型的差异
 def generate_changes_report(differences):
     """
     生成统一的变化报告
@@ -181,13 +189,16 @@ def generate_changes_report(differences):
 
         for filename, diff_dict, old_data, new_data in differences:
             if not diff_dict: continue
+            
+            # 【核心修复】在处理之前，先将整个diff_dict净化
+            serializable_diff = make_json_serializable(diff_dict)
 
             md_content += f"## 📄 `{filename}`\n\n"
-            json_change = {"file": filename, "diff": diff_dict}
+            json_change = {"file": filename, "diff": serializable_diff}
             has_change = False
 
-            # 新增
-            added = diff_dict.get("added", [])
+            # 新增 (by content)
+            added = serializable_diff.get("added", [])
             if added:
                 md_content += "### ➕ 新增规则 (by content)\n"
                 for item in added:
@@ -195,8 +206,8 @@ def generate_changes_report(differences):
                 md_content += "\n"
                 has_change = True
 
-            # 删除
-            removed = diff_dict.get("removed", [])
+            # 删除 (by content)
+            removed = serializable_diff.get("removed", [])
             if removed:
                 md_content += "### ❌ 删除规则 (by content)\n"
                 for item in removed:
@@ -205,7 +216,7 @@ def generate_changes_report(differences):
                 has_change = True
 
             # 修改（其他字段）
-            modified = diff_dict.get("modified", {})
+            modified = serializable_diff.get("modified", {})
             if modified:
                 md_content += "### 🔁 修改其他字段\n"
                 changed = modified.get("values_changed", {})
@@ -213,6 +224,20 @@ def generate_changes_report(differences):
                     old = change.get('old_value', 'N/A')
                     new = change.get('new_value', 'N/A')
                     md_content += f"- `{key}`: `{old}` → `{new}`\n"
+                
+                # 也报告其他类型的修改，例如字典项的增删
+                dict_added = modified.get("dictionary_item_added", [])
+                if dict_added:
+                    md_content += f"#### 新增字典项:\n"
+                    for item in dict_added:
+                         md_content += f"- `{item}`\n"
+                
+                dict_removed = modified.get("dictionary_item_removed", [])
+                if dict_removed:
+                    md_content += f"#### 删除字典项:\n"
+                    for item in dict_removed:
+                         md_content += f"- `{item}`\n"
+
                 md_content += "\n"
                 has_change = True
 
@@ -270,7 +295,6 @@ def main():
         x19_url = get_url("x19")
         g79_url = get_url("g79")
         
-        # --- 检查 URL 或哈希是否变化 ---
         if x19_url == cache.get("x19_url") and g79_url == cache.get("g79_url"):
             print("[INFO] URLs 未变化，无需更新。")
             generate_changes_report([])
@@ -278,14 +302,12 @@ def main():
 
         print("[*] URLs 发生变化，准备下载新内容...")
 
-        # --- 下载并解密 ---
         x19_data = decrypt_content(session.get(x19_url, verify=False).content, "c42bf7f39d479999")
         g79_data = decrypt_content(session.get(g79_url, verify=False).content, "c42bf7f39d476db3")
 
         new_x19_hash = hash_json(x19_data)
         new_g79_hash = hash_json(g79_data)
 
-        # 【修复】使用新的对比逻辑
         all_data = [
             ("X19SensitiveWords.json", x19_data, new_x19_hash),
             ("G79SensitiveWords.json", g79_data, new_g79_hash),
@@ -301,7 +323,6 @@ def main():
                 except Exception as e:
                     print(f"[WARN] 无法读取旧文件 {name}: {e}")
             
-            # 使用自定义函数进行内容对比
             diff = compare_words_by_content(old_data or {}, new_data)
 
             if diff:
@@ -317,11 +338,9 @@ def main():
 
         if not has_content_changed:
             print("[INFO] 所有文件均无实质变化，无需提交。")
-            # 即使内容没变，URL也可能变了，所以依然要保存缓存
             save_cache(x19_url, g79_url, new_x19_hash, new_g79_hash)
             return
 
-        # --- 更新 GitHub 文件 ---
         for filename, data in files_to_update:
             content = json.dumps(data, ensure_ascii=False, indent=4)
             update_github_file(
