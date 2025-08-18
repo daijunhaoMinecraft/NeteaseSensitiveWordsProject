@@ -57,11 +57,16 @@ jobs:
         cd build
         TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
         COMMIT_SHORT=$(git rev-parse --short HEAD)
-        mkdir -p "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
-        cp Netease_sensitive_word "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}/"
-        tar -czf "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}.tar.gz" "Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
+        DIR_NAME="Netease_sensitive_word_linux_${COMMIT_SHORT}_${TIMESTAMP}"
+        TAR_NAME="${DIR_NAME}.tar.gz"
+
+        mkdir -p "$DIR_NAME"
+        cp Netease_sensitive_word "$DIR_NAME/"
+
+        tar -czf "$TAR_NAME" "$DIR_NAME"
+        
         mkdir -p ./artifact
-        mv "*.tar.gz" ./artifact/
+        mv "$TAR_NAME" ./artifact/
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4  # ✅ 已升级到 v4
