@@ -54,9 +54,9 @@ struct ReviewWordsResult
     int code;
     std::string message;
     ReviewWordsRegularId regularIdList;
-    // extra 转换后的内容
+    // extra 替换后的内容
     std::string ReplaceContent;
-    // extra 原先内容
+    // extra 原始内容
     std::string OriginalContent;
 };
 
@@ -218,17 +218,17 @@ std::string bytes_to_string(const std::vector<uint8_t>& bytes) {
 }
 
 
-// 在线获取网易敏感词配置
+// 在线获取敏感词配置
 std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
     // {"info":{"deviceid":"6A4B-A3A3-D87C-11C5-6477","gameid":"g79","network":"wifi","sys":"cpp","version":"1.0.9"}}
     std::string request_data = "{\"info\":{\"deviceid\":\"6A4B-A3A3-D87C-11C5-6477\",\"gameid\":\"" + gameid + "\",\"network\":\"wifi\",\"sys\":\"cpp\",\"version\":\"1.0.9\"}}";
     // Base64编码
     std::string base64_request_data = base64_encode(request_data);
 
-    // 创建http请求
+    // 创建http客户端
     httplib::Client cli("http://optsdk.gameyw.netease.com");
     httplib::Headers headers = {
-        {"Content-Type", "application/x-www-form-urlencoded"}
+            {"Content-Type", "application/x-www-form-urlencoded"}
     };
 
     auto response1 = cli.Post("/initbox_" + gameid + ".html", headers, base64_request_data, "text/plain");
@@ -250,7 +250,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
     std::string GetUrl = GetJsonResponse["url"];
     //std::cout << "Get URL: " << GetUrl << std::endl;
 
-    // Https请求获取加密敏感词库
+    // Https请求获取敏感词配置
     size_t protocol_end = GetUrl.find("://");
     if (protocol_end == std::string::npos) {
         std::cerr << "Invalid URL format" << std::endl;
@@ -280,7 +280,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         return "";
     }
 
-    // 解密敏感词库
+    // 解析敏感词配置
     std::vector<uint8_t> encrypted_data = base64_decode_to_bytes(response2->body);
 
     std::string key;
@@ -291,10 +291,10 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         key = "c42bf7f39d479999";
     }
 
-    // RC4解密加密字节
+    // RC4解密得到字节
     std::string decrypted_data = rc4_decrypt_bytes_to_string(encrypted_data, string_to_bytes(key));
 
-    // 返回解密后的敏感词库
+    // 返回解密后敏感词配置
     return decrypted_data;
 }
 
@@ -302,30 +302,44 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
 SensitiveWordFilter sensitive_word_filter_g79;
 SensitiveWordFilter sensitive_word_filter_x19;
 
-// 修改init_sensitive_word函数，添加gameid参数和对应的敏感词过滤器
+// 释放PCRE2编译后的正则表达式资源
+void free_pcre2_regex(SensitiveWordFilter& filter) {
+    for (auto& regex_type : filter.RegexList) {
+        for (auto& regex : regex_type.RegexList) {
+            if (regex.compiled_regex != nullptr) {
+                pcre2_code_free_8(regex.compiled_regex);
+                regex.compiled_regex = nullptr;
+            }
+        }
+    }
+}
+
+// 修改init_sensitive_word函数，增加gameid参数来对应不同的敏感词配置
 void init_sensitive_word(SensitiveWordFilter& filter, const std::string& gameid){
-    // 清空之前的敏感词库
+    // 清理之前的所有敏感词配置
+    free_pcre2_regex(filter);
     filter.RegexList.clear();
-    // 在线获取敏感词库
+    
+    // 在线获取敏感词配置
     std::string GetConfigFile = GetSensitiveWordConfigOnline(gameid);
     if (GetConfigFile.empty()) {
         std::cerr << "Failed to get sensitive word config for game: " << gameid << std::endl;
         return;
     }
-    // 转换成json
+    // 转换为json
     nlohmann::json json_content = nlohmann::json::parse(GetConfigFile);
-    // 遍历规则
+    // 遍历所有
     for (auto& item : json_content["regex"].items()) {
-        // 获取规则名称
+        // 获取类型名称
         std::string key = item.key(); // intercept/shield/replace/nickname/remind
         RegexTypeStruct regex_type;
         regex_type.RegexType = key;
         regex_type.RegexList.clear();
-        // 遍历单个规则中的所有敏感词库
+        // 遍历类型中所有的敏感词配置
         for (auto& Pcre2Regex : json_content["regex"][key].items()) {
             std::string RegexID = Pcre2Regex.key();
             std::string Regex = Pcre2Regex.value();
-            // PCRE2解析
+            // PCRE2编译
             int errornumber;
             PCRE2_SIZE erroroffset;
             uint32_t compile_options = PCRE2_UTF | PCRE2_UCP;
@@ -355,11 +369,11 @@ std::string ReplaceNickName(std::string text, SensitiveWordFilter& filter) {
     std::string replaced_text = text;
     bool IsPass = true;
     for (auto &regex_type: filter.RegexList) {
-        // 获取规则名称
+        // 获取类型名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Nickname) {
             for (auto &regex: regex_type.RegexList) {
-                // 初始化常量
+                // 初始化正则
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
@@ -367,6 +381,9 @@ std::string ReplaceNickName(std::string text, SensitiveWordFilter& filter) {
                 // 匹配
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
                     // 检测到敏感词(执行替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
@@ -396,18 +413,21 @@ ReviewNickNameResult reviewNickName(const std::string& text, SensitiveWordFilter
     ReviewNickNameResult result;
     bool is_pass = true;
     for (auto& regex_type : filter.RegexList) {
-        // 获取规则名称
+        // 获取类型名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Nickname) {
             for (auto &regex: regex_type.RegexList) {
-                // 初始化常量
+                // 初始化正则
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // 匹配规则
+                // 匹配检测
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
                                        match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
                     // 匹配到: shield
                     is_pass = false;
@@ -435,20 +455,23 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
     std::string replaced_text = text;
     bool IsPass = true;
     for (auto &regex_type: filter.RegexList) {
-        // 获取规则名称
+        // 获取类型名称
         std::string RegexType = regex_type.RegexType;
         if (RegexType == SensitiveWordConstResult::Shield) {
             for (auto &regex: regex_type.RegexList) {
-                // 初始化常量
+                // 初始化正则
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
+                // 匹配检测
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
-                                     match_data, nullptr);
+                                       match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
-                    // 匹配到规则(执行替换操作)
+                    // 匹配到敏感词(执行替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
@@ -464,16 +487,19 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
         }
         else if (RegexType == SensitiveWordConstResult::Intercept) {
             for (auto &regex: regex_type.RegexList) {
-                // ??
+                // 初始化正则
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
+                // 匹配检测
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
-                                     match_data, nullptr);
+                                       match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
-                    // 匹配到规则(替换操作)
+                    // 匹配到敏感词(替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
@@ -490,16 +516,19 @@ std::string ReplaceWords(std::string text, SensitiveWordFilter& filter) {
         else if (RegexType == SensitiveWordConstResult::Replace)
         {
             for (auto &regex: regex_type.RegexList) {
-                // ??
+                // 初始化正则
                 std::string RegexID = regex.RegexID;
                 std::string Regex = regex.Regex;
                 pcre2_code_8 *compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8 *match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
-                // ??
+                // 匹配检测
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR) text.c_str(), (PCRE2_SIZE) text.size(), 0, 0,
-                                     match_data, nullptr);
+                                       match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
-                    // 匹配到规则(替换操作)
+                    // 匹配到敏感词(替换操作)
                     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer_8(match_data);
                     PCRE2_SIZE start = ovector[0];
                     PCRE2_SIZE end = ovector[1];
@@ -526,7 +555,7 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
 {
     ReviewWordsResult result;
     bool is_pass = true;
-    // 初始化规则id(List)
+    // 初始化正则id(List)
     ReviewWordsRegularId RegularId;
     // 循环遍历
     for (auto& regex_type : filter.RegexList) {
@@ -538,8 +567,11 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
-                    // д: shield
+                    // 匹配到: shield
                     is_pass = false;
                     RegularId.Intercept.push_back(RegexID);
                 }
@@ -553,6 +585,9 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
                     is_pass = false;
                     RegularId.Intercept.push_back(RegexID);
@@ -566,6 +601,9 @@ ReviewWordsResult reviewWords(const std::string& text,std::string original_text,
                 pcre2_code_8* compiled_regex = regex.compiled_regex;
                 pcre2_match_data_8* match_data = pcre2_match_data_create_from_pattern_8(compiled_regex, nullptr);
                 int rc = pcre2_match_8(compiled_regex, (PCRE2_SPTR)text.c_str(), (PCRE2_SIZE)text.size(), 0, 0, match_data, nullptr);
+                // 释放匹配数据内存
+                pcre2_match_data_free_8(match_data);
+                
                 if (rc > 0) {
                     is_pass = false;
                     RegularId.Replace.push_back(RegexID);
@@ -612,7 +650,7 @@ ReviewWordsResult reviewWords_Request(const std::string& content, const std::str
             std::string prefix = "_content=";
             size_t pos = RequestResult.ReplaceContent.find(prefix);
             if (pos != std::string::npos) {
-                // ?_content=?
+                // 提取_content=后的内容
                 RequestResult.ReplaceContent = RequestResult.ReplaceContent.substr(pos + prefix.length());
             }
         }
@@ -655,10 +693,10 @@ int main(int argc, char** argv) {
         res.set_content("Hello World!", "text/plain");
     });
 
-    // g79敏感词检测路由
+    // g79敏感词检测路径
     svr.Post("/g79/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
-            // POST
+            // POST请求数据
             std::string content = req.body;
             nlohmann::json json_content = nlohmann::json::parse(content);
             std::string level = json_content["level"];
@@ -692,7 +730,7 @@ int main(int argc, char** argv) {
             response_json["regularIdList"] = regular_id_list_json;
             response_json["ReplaceContent"] = result.ReplaceContent;
             response_json["OriginalContent"] = result.OriginalContent;
-            
+
             std::string response_str = response_json.dump();
             //std::cout << "Response JSON: " << response_str << std::endl;
             res.set_content(response_str, "application/json");
@@ -708,7 +746,7 @@ int main(int argc, char** argv) {
 
     svr.Post("/g79/review/nickname", [](const httplib::Request& req, httplib::Response& res) {
         try {
-            // POST
+            // POST请求数据
             std::string content = req.body;
             nlohmann::json json_content = nlohmann::json::parse(content);
             std::string NickName = json_content["nickname"];
@@ -736,10 +774,10 @@ int main(int argc, char** argv) {
         }
     });
 
-    // x19敏感词检测路由
+    // x19敏感词检测路径
     svr.Post("/x19/review/words", [](const httplib::Request& req, httplib::Response& res) {
         try {
-            // POST
+            // POST请求数据
             std::string content = req.body;
             nlohmann::json json_content = nlohmann::json::parse(content);
             std::string level = json_content["level"];
@@ -774,12 +812,12 @@ int main(int argc, char** argv) {
             response_json["ReplaceContent"] = result.ReplaceContent;
             response_json["OriginalContent"] = result.OriginalContent;
 
-            // ?
+            // 返回结果
             std::string response_str = response_json.dump();
             //std::cout << "Response JSON: " << response_str << std::endl;
             res.set_content(response_str, "application/json");
         } catch (const std::exception& e) {
-            //
+            // 错误处理
             std::cerr << "Error processing request: " << e.what() << std::endl;
             nlohmann::json error_json;
             error_json["code"] = 500;
@@ -791,7 +829,7 @@ int main(int argc, char** argv) {
 
     svr.Post("/x19/review/nickname", [](const httplib::Request& req, httplib::Response& res) {
         try {
-            // POST
+            // POST请求数据
             std::string content = req.body;
             nlohmann::json json_content = nlohmann::json::parse(content);
             std::string NickName = json_content["nickname"];
@@ -818,7 +856,7 @@ int main(int argc, char** argv) {
             res.status = 500;
         }
     });
-    
+
     // 监听端口:8143
     svr.listen("0.0.0.0", 8143);
     return 0;
