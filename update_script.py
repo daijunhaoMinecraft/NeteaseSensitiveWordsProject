@@ -214,7 +214,7 @@ def main():
             return data["url"]
 
         x19_url = get_url("x19")
-        g79_url = get_url("g79")
+        g79_url = get_url("android_g79")
         
         if x19_url == cache.get("x19_url") and g79_url == cache.get("g79_url"):
             print("[INFO] URLs 未变化，无需更新。")

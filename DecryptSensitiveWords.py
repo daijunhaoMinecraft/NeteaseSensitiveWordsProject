@@ -89,7 +89,7 @@ if __name__ == '__main__':
     BuildPostJson_x19 = {"version":"2.4.0.161787","sys":"windows","deviceid":"AA85-636D-18B2-3937-834B-D59E","gameid":"x19","network":"wifi","info":{}}
     BuildPostJson_g79 = {"version":"2.4.0.161787","sys":"windows","deviceid":"AA85-636D-18B2-3937-834B-D59E","gameid":"g79","network":"wifi","info":{}}
     GetX19Url = requests.post("http://optsdk.gameyw.netease.com/initbox_x19.html",data=base64.b64encode(json.dumps(BuildPostJson_x19).encode('utf-8')).decode("utf-8"),headers={"Content-Type": "application/x-www-form-urlencoded"},verify=False).json()["url"]
-    GetG79Url = requests.post("http://optsdk.gameyw.netease.com/initbox_g79.html",data=base64.b64encode(json.dumps(BuildPostJson_g79).encode('utf-8')).decode("utf-8"),headers={"Content-Type": "application/x-www-form-urlencoded"},verify=False).json()["url"]
+    GetG79Url = requests.post("http://optsdk.gameyw.netease.com/initbox_android_g79.html",data=base64.b64encode(json.dumps(BuildPostJson_g79).encode('utf-8')).decode("utf-8"),headers={"Content-Type": "application/x-www-form-urlencoded"},verify=False).json()["url"]
     GetX19EncryptedContent = requests.get(GetX19Url,verify=False).content
     GetG79EncryptedContent = requests.get(GetG79Url,verify=False).content
     X19Key = "c42bf7f39d479999"
