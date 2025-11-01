@@ -226,7 +226,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
         isG79 = true;
     }
     // {"info":{"deviceid":"6A4B-A3A3-D87C-11C5-6477","gameid":"g79","network":"wifi","sys":"cpp","version":"1.0.9"}}
-    networkGameID = isG79 ? "android_g79" : gameid;
+    std::string networkGameID = isG79 ? "android_g79" : gameid;
     std::string request_data = "{\"info\":{\"deviceid\":\"6A4B-A3A3-D87C-11C5-6477\",\"gameid\":\"" + gameid + "\",\"network\":\"wifi\",\"sys\":\"cpp\",\"version\":\"1.0.9\"}}";
     // Base64编码
     std::string base64_request_data = base64_encode(request_data);
