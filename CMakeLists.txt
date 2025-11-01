@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(Netease_sensitive_word
         server.cpp
+        server.cpp
 )
 
 find_package(httplib CONFIG REQUIRED)

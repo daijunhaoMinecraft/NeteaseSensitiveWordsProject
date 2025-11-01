@@ -220,7 +220,13 @@ std::string bytes_to_string(const std::vector<uint8_t>& bytes) {
 
 // 在线获取敏感词配置
 std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
+    bool isG79 = false;
+    if (gameid == "g79")
+    {
+        isG79 = true;
+    }
     // {"info":{"deviceid":"6A4B-A3A3-D87C-11C5-6477","gameid":"g79","network":"wifi","sys":"cpp","version":"1.0.9"}}
+    networkGameID = isG79 ? "android_g79" : gameid;
     std::string request_data = "{\"info\":{\"deviceid\":\"6A4B-A3A3-D87C-11C5-6477\",\"gameid\":\"" + gameid + "\",\"network\":\"wifi\",\"sys\":\"cpp\",\"version\":\"1.0.9\"}}";
     // Base64编码
     std::string base64_request_data = base64_encode(request_data);
@@ -231,7 +237,7 @@ std::string GetSensitiveWordConfigOnline(const std::string& gameid) {
             {"Content-Type", "application/x-www-form-urlencoded"}
     };
 
-    auto response1 = cli.Post("/initbox_" + gameid + ".html", headers, base64_request_data, "text/plain");
+    auto response1 = cli.Post("/initbox_" + networkGameID + ".html", headers, base64_request_data, "text/plain");
 
     if (!response1 || response1->status != 200) {
         std::cerr << "Failed to get URL: " << (response1 ? std::to_string(response1->status) : "null response") << std::endl;
