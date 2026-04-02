@@ -1,27 +1,8 @@
 # 网易我的世界敏感词检测
 
-**CPP代码是自己写的，文档是Claude4+人工修改的，Python脚本解密是Gemini写的，Github Actions刷新敏感词是Gemini和Qwen混着用的**<br/>
 一个基于 C++ 开发的高性能敏感词过滤 HTTP 服务，支持多PC敏感词检测(X19)和PE敏感词检测(G79)，每小时自动更新，词库来源于网易我的世界，解密来源于IDA Pro → libenvsdk<br/>
 目前已集成到[NeteaseHelper](https://neteasehelper.theconsole.top/)中(支持API)，欢迎各位去体验此网站<br/>
 [敏感词API测试地址(Apifox)](https://apidocs.theconsole.top/291794037e0)<br/>
-## 功能特性
-
-- 🎯 **多游戏支持**: 支持 g79 和 x19 两个游戏的敏感词过滤
-- 🔄 **实时更新**: 每小时自动从远程服务器更新敏感词规则
-- 🛡️ **多种过滤策略**: 支持拦截 (intercept)、屏蔽 (shield)、替换 (replace) 等多种处理方式
-- 👤 **昵称检测**: 专门的昵称敏感词检测接口
-- 🔒 **安全加密**: 使用 RC4 加密算法解密远程配置
-- ⚡ **高性能**: 基于 PCRE2 正则表达式引擎，处理速度快
-- 🌐 **RESTful API**: 提供标准的 HTTP JSON API
-
-## 技术栈
-
-- **语言**: C++
-- **HTTP 服务**: cpp-httplib
-- **JSON 处理**: nlohmann/json
-- **正则表达式**: PCRE2
-- **解密**: RC4 算法
-- **SSL/TLS**: OpenSSL
 
 ## 编译依赖
 
