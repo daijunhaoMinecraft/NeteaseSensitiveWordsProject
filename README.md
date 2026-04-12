@@ -206,3 +206,6 @@ print(json.dumps(result, indent=2, ensure_ascii=False))
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request 来改进这个项目。
+
+## 感谢
+感谢来自 Linux Do 社区提供的宣传
