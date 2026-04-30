@@ -1,7 +1,5 @@
 # 网易我的世界敏感词检测
 
-**CPP代码是自己写的，文档是Claude4+人工修改的，Python脚本解密是Gemini写的，Github Actions刷新敏感词是Gemini和Qwen混着用的**<br/>
-
 一个基于 C++ 开发的高性能敏感词过滤 HTTP 服务，支持多PC敏感词检测(X19)和PE敏感词检测(G79)，每小时自动更新，词库来源于网易我的世界，解密来源于IDA Pro → libenvsdk<br/>
 目前已集成到[NeteaseHelper](https://neteasehelper.theconsole.top/)中(支持API)，欢迎各位去体验此网站<br/>
 [敏感词API测试地址(Apifox)](https://apidocs.theconsole.top/291794037e0)<br/>
@@ -206,6 +204,3 @@ print(json.dumps(result, indent=2, ensure_ascii=False))
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request 来改进这个项目。
-
-## 感谢
-感谢来自 [Linux Do](https://linux.do) 社区提供的宣传
