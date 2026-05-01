@@ -41,7 +41,7 @@ jobs:
           if ! git diff --quiet; then
             echo "Changes detected. Committing and pushing..."
             git add .
-            git commit -m "🤖 Auto update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            git commit -m "[Bot] Auto update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
             
             # 在推送前拉取并变基，防止冲突
             git pull --rebase
