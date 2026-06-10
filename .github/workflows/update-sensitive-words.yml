@@ -1,8 +1,8 @@
 name: 🔄 Auto Update Sensitive Words
 
 on:
-  schedule:
-    - cron: '0 3 * * *'  # 每天 UTC 3:00
+  # schedule:
+  #   - cron: '0 3 * * *'  # 每天 UTC 3:00
   workflow_dispatch:
 
 jobs:
