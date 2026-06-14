@@ -3,6 +3,10 @@
 一个基于 C++ 开发的高性能敏感词过滤 HTTP 服务，支持多PC敏感词检测(X19)和PE敏感词检测(G79)，每小时自动更新，词库来源于网易我的世界，解密来源于IDA Pro → libenvsdk<br/>
 在线测试: [https://neteasemcapi.theconsole.top/SensitiveWords](https://neteasemcapi.theconsole.top/SensitiveWords)
 
+**2026/06/14: 基岩版中的 libenvsdk.dll 敏感词库将会以本地的方式运行, 因此暂时不开源解密方法**
+
+
+
 ## 编译依赖
 
 ```bash
@@ -20,8 +24,8 @@ brew install pcre2 openssl nlohmann-json
 
 ```bash
 # 克隆项目
-git clone <repository-url>
-cd sensitive-word-filter
+git clone https://github.com/daijunhaoMinecraft/NeteaseSensitiveWordsProject
+cd NeteaseSensitiveWordsProject
 
 # 编译
 g++ -std=c++17 -O2 \
