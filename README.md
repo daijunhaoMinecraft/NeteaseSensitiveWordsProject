@@ -4,8 +4,7 @@
 在线测试: [https://neteasemcapi.theconsole.top/SensitiveWords](https://neteasemcapi.theconsole.top/SensitiveWords)
 
 **2026/06/14: 基岩版中的 libenvsdk.dll 敏感词库将会以本地的方式运行, 因此暂时不开源解密方法**
-
-
+**2026/08/11: 收到线下真实, 此仓库先后 Private 之后不再维护**
 
 ## 编译依赖
 
