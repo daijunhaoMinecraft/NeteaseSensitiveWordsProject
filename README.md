@@ -3,8 +3,8 @@
 一个基于 C++ 开发的高性能敏感词过滤 HTTP 服务，支持多PC敏感词检测(X19)和PE敏感词检测(G79)，每小时自动更新，词库来源于网易我的世界，解密来源于IDA Pro → libenvsdk<br/>
 在线测试: [https://neteasemcapi.theconsole.top/SensitiveWords](https://neteasemcapi.theconsole.top/SensitiveWords)
 
-**2026/06/14: 基岩版中的 libenvsdk.dll 敏感词库将会以本地的方式运行, 因此暂时不开源解密方法**
-**2026/08/11: 收到线下真实, 此仓库先后 Private 之后不再维护**
+**2026/06/14: 基岩版中的 libenvsdk.dll 敏感词库将会以本地的方式运行, 因此暂时不开源解密方法**<br/>
+**2026/08/11: 收到网警线下真实, 此仓库将不再维护**
 
 ## 编译依赖
 
